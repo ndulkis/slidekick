@@ -5,13 +5,15 @@ services:
     api: 3
     type: lando
 
-    overrides:
+    services:
       build:
         context: .
         dockerfile: docker/dev/Dockerfile
 
-      # The image's CMD already holds the container open; PYTHONPATH is what
-      # makes `import slidekick` resolve to src/slidekick without an install step.
+      # Lando sets its own entrypoint, which clears the image's CMD, so the
+      # keep-alive command has to be declared here. PYTHONPATH is what makes
+      # `import slidekick` resolve to src/slidekick without an install step.
+      command: sleep infinity
       environment:
         PYTHONPATH: /app/src
 
