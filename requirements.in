@@ -1,0 +1,23 @@
+# Direct dependencies only. Edit this file, never requirements.lock.
+#
+# After any change here:
+#
+#     lando lock          # regenerate requirements.lock
+#     lando rebuild -y    # reinstall inside the image
+#
+# Versions are left unpinned here on purpose — requirements.lock is what pins
+# them, and the lock is what the image installs.
+
+# Core
+numpy
+# Headless build: the container has no display, and this avoids pulling in GUI
+# system libraries. Native webcam/GUI work happens on the host.
+opencv-python-headless
+
+# Test and lint tooling
+pytest
+ruff
+
+# Keeps pip-compile available inside the container so `lando lock` works
+# without any host Python.
+pip-tools

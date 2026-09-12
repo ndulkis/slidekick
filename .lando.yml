@@ -1,0 +1,55 @@
+name: slidekick
+
+services:
+  app:
+    api: 3
+    type: lando
+
+    services:
+      build:
+        context: .
+        dockerfile: docker/dev/Dockerfile
+
+      # Lando sets its own entrypoint, which clears the image's CMD, so the
+      # keep-alive command has to be declared here. PYTHONPATH is what makes
+      # `import slidekick` resolve to src/slidekick without an install step.
+      command: sleep infinity
+      environment:
+        PYTHONPATH: /app/src
+
+tooling:
+  shell:
+    service: app
+    cmd: bash
+    dir: /app
+
+  test:
+    service: app
+    cmd: python -m pytest
+    dir: /app
+
+  lint:
+    service: app
+    cmd: ruff check .
+    dir: /app
+
+  format:
+    service: app
+    cmd: ruff format .
+    dir: /app
+
+  python:
+    service: app
+    cmd: python
+    dir: /app
+
+  # Regenerate requirements.lock from requirements.in. Run this inside the
+  # container so the resolution matches the image's Python, then rebuild.
+  #
+  # The flags must stay byte-identical to the command recorded in the header of
+  # requirements.lock — pip-compile writes its own invocation into that header,
+  # so any difference shows up as a diff even when the resolved versions match.
+  lock:
+    service: app
+    cmd: pip-compile --no-index --output-file=requirements.lock --strip-extras requirements.in
+    dir: /app
