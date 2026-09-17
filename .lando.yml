@@ -26,6 +26,18 @@ tooling:
     cmd: bash
     dir: /app
 
+  # Diagnose the dev environment and print a fix for anything wrong.
+  doctor:
+    service: app
+    cmd: python scripts/check_env.py
+    dir: /app
+
+  # Run doctor, then every check CI runs (except the Docker build).
+  verify:
+    service: app
+    cmd: bash scripts/verify.sh
+    dir: /app
+
   test:
     service: app
     cmd: python -m pytest

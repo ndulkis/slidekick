@@ -1,0 +1,226 @@
+name: SlideKick CI
+
+on:
+  # Primary quality gate: run CI whenever code is proposed for a long-lived
+  # branch. The run tests the PR merged into its target.
+  pull_request:
+    branches: [production, develop]
+
+  # Every branch, so feature branches get feedback before a PR is opened, and
+  # production/develop are verified in their final merged state.
+  push:
+    branches: ["**"]
+
+  # Lets the team run CI manually from the Actions tab.
+  workflow_dispatch:
+
+# If new commits are pushed to the same branch or PR, cancel the older run.
+concurrency:
+  group: slidekick-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Keep these in step with docker/dev/Dockerfile so CI matches `lando` locally.
+# tests/environment fails if they drift apart.
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  quality:
+    name: Lint and Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Same as .lando.yml, so `import slidekick` resolves to src/slidekick.
+    env:
+      PYTHONPATH: src
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      # Same lock file the Lando image installs.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock
+
+      # `lando doctor` in CI mode: skips the container-only checks.
+      - name: Run environment doctor
+        run: python scripts/check_env.py --ci
+
+      - name: Lint
+        run: ruff check --output-format=github .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      # Version drift between the Dockerfile, ci.yml, and requirements.lock.
+      - name: Run environment tests
+        run: python -m pytest -q tests/environment
+
+      - name: Run unit tests
+        run: python -m pytest -q tests/unit
+
+  gesture-smoke-test:
+    name: Gesture Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock
+
+      # Keep smoke tests lightweight:
+      # - model loads
+      # - sample input can be processed
+      # - gesture result has the expected structure
+      # - command mapping works (covered today via the presentation adapter)
+      #
+      # Do not retrain the model here. Runners have no webcam or display, so
+      # use prerecorded samples and the fake pyautogui in tests/conftest.py.
+      - name: Run smoke tests
+        run: python -m pytest -q tests/smoke
+
+  frontend:
+    name: Frontend Lint, Tests and Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm run test
+
+      # Includes `tsc -b`, so this is also the type check.
+      - name: Build
+        run: npm run build
+
+  container-build:
+    name: Verify Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Verifies that a clean environment can still build the image Lando
+      # uses, which guards against "works on my machine" drift.
+      - name: Build SlideKick dev image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/dev/Dockerfile
+          push: false
+          tags: slidekick-dev:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # OPTIONAL PRODUCTION-ONLY CHECKS
+  #
+  # Slower checks can be added here later. Restricting them to pushes on
+  # production keeps them from slowing down every branch and pull request.
+  # ---------------------------------------------------------------------------
+
+  # model-evaluation:
+  #   name: Model Regression Evaluation
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 20
+  #   needs: [quality, gesture-smoke-test, container-build]
+  #
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
+  #         cache: pip
+  #         cache-dependency-path: requirements.lock
+  #
+  #     - name: Install dependencies
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install -r requirements.lock
+  #
+  #     # Keep the CI validation dataset small and deterministic.
+  #     # Possible future checks:
+  #     # - recognition accuracy
+  #     # - false-positive rate
+  #     # - inference latency
+  #     - name: Evaluate model
+  #       run: |
+  #         python scripts/evaluate_model.py --dataset tests/data/ci_validation
+
+  # integration:
+  #   name: Integration Tests
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/production'
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 15
+  #   needs: [quality, gesture-smoke-test, container-build]
+  #
+  #   steps:
+  #     - name: Check out repository
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Build container
+  #       run: docker build -f docker/dev/Dockerfile -t slidekick-dev:ci .
+  #
+  #     # The image holds dependencies only, not source (Lando mounts the repo),
+  #     # so mount the checkout the same way.
+  #     #
+  #     # Prefer mocked presentation controls and prerecorded camera data.
+  #     # CI should not depend on a physical webcam, PowerPoint, Keynote, or
+  #     # another desktop application being available.
+  #     - name: Run integration tests
+  #       run: |
+  #         docker run --rm -v "$PWD":/app -w /app -e PYTHONPATH=/app/src \
+  #           slidekick-dev:ci python -m pytest -q tests/integration
