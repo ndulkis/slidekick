@@ -139,5 +139,6 @@ When `develop` is ready to release, merge it into `production` with a PR.
 
 ## Docs
 
+- [Environment verification](docs/environment-verification.md): where teammates record proof their setup works
 - [UI states](docs/ui-states.md): dashboard states to support, plus accessibility personas
 - [Keyboard navigation testing](docs/keyboard-nav-testing.md): manual accessibility test results for the dashboard shell
