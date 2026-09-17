@@ -19,12 +19,12 @@ Control presentations with hand gestures. SlideKick watches a webcam, recognizes
 ```
 .
 ├── src/slidekick/        Python package (presentation adapters, future gesture code)
-├── tests/                Python tests (pytest)
+├── tests/                Python tests: unit/, smoke/, environment/
 ├── frontend/             Dashboard app: Dashboard, Session, and Settings pages
 ├── docs/                 Design and testing notes
 ├── docker/dev/           Dockerfile for the Lando dev container
 ├── data/, models/        Local datasets and model files (git-ignored, not in the image)
-├── scripts/              Utility scripts
+├── scripts/              Dev scripts: check_env.py (`lando doctor`), verify.sh (`lando verify`)
 ├── manual_test.py        Host-only check that the keyboard adapter changes slides
 ├── requirements.in       Direct Python dependencies (edit this)
 └── requirements.lock     Pinned versions generated from requirements.in (don't edit)
@@ -40,15 +40,36 @@ cd slidekick
 
 lando start          # build and start the dev container
 lando npm ci         # install frontend dependencies
+lando verify         # confirm your environment is set up correctly
 lando frontend-dev   # dashboard at http://localhost:5173
 ```
 
 The repo is mounted into the container at `/app`, and `src/` is on `PYTHONPATH`, so `import slidekick` works without an install step.
 
+### Verify your setup
+
+| Command | When to use it |
+| --- | --- |
+| `lando doctor` | Fast environment check (a few seconds). Prints a fix for anything wrong. |
+| `lando verify` | Runs `doctor`, then every check CI runs. If this passes, CI should too. |
+
+`doctor` checks that:
+
+- you're inside the container, with the repo at `/app`
+- the Python and Node versions match `docker/dev/Dockerfile`
+- installed Python packages match `requirements.lock`
+- `frontend/node_modules` matches `package-lock.json`
+- NumPy, OpenCV, ffmpeg, Ruff, pytest, and pip-compile all work
+- `data/` and `models/` are writable
+
+The most common fixes are `lando rebuild -y` (the image is out of date, e.g. after someone changes the Dockerfile or lock file) and `lando npm ci` (frontend dependencies are missing or stale). Run `lando doctor` again after pulling changes that touch either.
+
 ## Common commands
 
 | Command | What it does |
 | --- | --- |
+| `lando doctor` | Check the dev environment and suggest fixes |
+| `lando verify` | Run `doctor` plus all CI checks, with a summary |
 | `lando shell` | Open a bash shell in the container |
 | `lando python` | Python REPL |
 | `lando test` | Run the Python tests |
@@ -85,13 +106,28 @@ You have 3 seconds to click into an open presentation. It should move forward on
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every branch push and on pull requests into `develop` or `production`. It runs three jobs:
+`.github/workflows/ci.yml` runs on pushes to every branch and on pull requests into `develop` or `production`. It runs four jobs in parallel:
 
-- **Python:** `ruff check`, `ruff format --check`, `pytest tests`
-- **Frontend:** `oxlint`, Vitest, and a production build (which also type-checks)
-- **Docker:** builds `docker/dev/Dockerfile`
+| Job | What it runs |
+| --- | --- |
+| Lint and Unit Tests | `check_env.py --ci`, `ruff check`, `ruff format --check`, `tests/environment`, `tests/unit` |
+| Gesture Smoke Tests | `tests/smoke` |
+| Frontend | oxlint, Vitest, and a production build (which also type-checks) |
+| Verify Docker Build | builds `docker/dev/Dockerfile` |
 
-Run `lando lint`, `lando format`, `lando test`, `lando frontend-lint`, and `lando frontend-test` before pushing to catch failures locally.
+Model evaluation and integration tests are stubbed out at the bottom of the workflow. When enabled, they run only on pushes to `production`.
+
+Run `lando verify` before pushing to catch the same failures locally.
+
+### Python test suites
+
+| Folder | Purpose |
+| --- | --- |
+| `tests/unit/` | Fast tests for individual modules |
+| `tests/smoke/` | End-to-end checks of the slide-control path. Later: model loads, a sample input is processed, commands map correctly. No retraining. |
+| `tests/environment/` | Fails if the Python or Node versions in the Dockerfile, `ci.yml`, and `requirements.lock` drift apart |
+
+`tests/conftest.py` provides a fake `pyautogui`, since neither Lando nor CI has a display. `lando test` runs all three suites.
 
 ## Branching
 
