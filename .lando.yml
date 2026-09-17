@@ -17,6 +17,9 @@ services:
       environment:
         PYTHONPATH: /app/src
 
+    ports:
+      - '5173:5173'
+
 tooling:
   shell:
     service: app
