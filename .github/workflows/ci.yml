@@ -3,8 +3,9 @@ name: SlideKick CI
 on:
   pull_request:
     branches: [production, develop]
+  # Every branch, so feature branches get checked before a PR is opened.
   push:
-    branches: [production, develop]
+    branches: ["**"]
   workflow_dispatch:
 
 # Prevent duplicate runs on the same branch/PR.
