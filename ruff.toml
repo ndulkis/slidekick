@@ -1,2 +1,2 @@
 [lint]
-extend-ignore = ["EXE002"]
+ignore = ["EXE002"]

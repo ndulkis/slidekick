@@ -10,6 +10,7 @@
 
 # Core
 numpy
+
 # Headless build: the container has no display, and this avoids pulling in GUI
 # system libraries. Native webcam/GUI work happens on the host.
 opencv-python-headless
@@ -21,6 +22,9 @@ pyautogui
 # it as an ASGI server inside the container.
 fastapi
 uvicorn[standard]
+# MediaPipe provides the hand landmark and gesture recognition pipeline used by
+# SlideKick for static gesture classification and landmark-based motion tracking.
+mediapipe
 
 # Test and lint tooling
 pytest

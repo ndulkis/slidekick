@@ -15,7 +15,14 @@ anyio==4.15.1
     #   starlette
     #   watchfiles
 build==1.6.1
+absl-py==2.5.0
+    # via mediapipe
+build==1.6.0
     # via pip-tools
+certifi==2026.7.22
+    # via mediapipe
+cffi==2.1.1
+    # via sounddevice
 click==8.5.0
     # via
     #   pip-tools
@@ -28,23 +35,46 @@ httptools==0.8.0
     # via uvicorn
 idna==3.20
     # via anyio
-iniconfig==2.3.0
-    # via pytest
 mouseinfo==0.1.3
     # via pyautogui
+    # via pip-tools
+contourpy==1.3.3
+    # via matplotlib
+cycler==0.12.1
+    # via matplotlib
+flatbuffers==25.12.19
+    # via mediapipe
+fonttools==4.65.0
+    # via matplotlib
+iniconfig==2.3.0
+    # via pytest
+kiwisolver==1.5.1
+    # via matplotlib
+matplotlib==3.11.2
+    # via mediapipe
+mediapipe==1.0.1
+    # via -r requirements.in
 numpy==2.4.6
     # via
     #   -r requirements.in
+    #   contourpy
+    #   matplotlib
+    #   mediapipe
+    #   opencv-contrib-python
     #   opencv-python-headless
+opencv-contrib-python==5.0.0.93
+    # via mediapipe
 opencv-python-headless==5.0.0.93
     # via -r requirements.in
 packaging==26.3
     # via
     #   build
+    #   matplotlib
     #   pytest
     #   wheel
 pillow==12.3.0
     # via pyscreeze
+    # via matplotlib
 pip-tools==7.6.1
     # via -r requirements.in
 pluggy==1.6.0
@@ -63,7 +93,11 @@ pymsgbox==2.0.1
     # via pyautogui
 pyperclip==1.11.0
     # via mouseinfo
-pyproject-hooks==1.3.3
+pycparser==3.0
+    # via cffi
+pyparsing==3.3.2
+    # via matplotlib
+pyproject-hooks==1.2.0
     # via
     #   build
     #   pip-tools
@@ -107,6 +141,14 @@ watchfiles==1.2.0
     # via uvicorn
 websockets==17.1
     # via uvicorn
+python-dateutil==2.9.0.post0
+    # via matplotlib
+ruff==0.16.5
+    # via -r requirements.in
+six==1.17.0
+    # via python-dateutil
+sounddevice==0.5.6
+    # via mediapipe
 wheel==0.48.0
     # via pip-tools
 

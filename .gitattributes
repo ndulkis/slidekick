@@ -1,0 +1,20 @@
+# Everything in this repo is executed inside the Linux container, so every text
+# file is checked out with LF endings regardless of the platform. Without this,
+# Git on Windows (core.autocrlf=true) rewrites files with CRLF and bash fails on
+# the stray carriage returns: `set: pipefail\r: invalid option`.
+* text=auto eol=lf
+
+# Files bash or Docker executes directly — never let these be CRLF.
+*.sh    text eol=lf
+Dockerfile text eol=lf
+
+# Binary files: leave the bytes alone.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.pptx  binary
+*.woff  binary
+*.woff2 binary
