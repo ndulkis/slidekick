@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from slidekick.presentation_adapter import KeyboardPresentationAdapter, PresentationAdapter
+from slidekick.presentation_adapter import (
+    KeyboardPresentationAdapter,
+    PresentationAdapter,
+)
 
 
 class GestureType(str, Enum):
