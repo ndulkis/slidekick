@@ -22,25 +22,38 @@ class KeyboardPresentationAdapter(PresentationAdapter):
 
     pyautogui is imported lazily inside each method rather than at module
     load time, since it requires a real display and would break importing
-    this module inside the headless dev container.
+    this module inside the headless dev container. Calls made without a
+    display (e.g. inside the container) return False instead of raising.
     """
 
     def next_slide(self) -> bool:
-        import pyautogui
+        try:
+            import pyautogui
+        except KeyError:
+            print("No display available: cannot simulate keystroke.")
+            return False
 
         print("Simulating: RIGHT arrow (Next Slide)")
         pyautogui.press("right")
         return True
 
     def previous_slide(self) -> bool:
-        import pyautogui
+        try:
+            import pyautogui
+        except KeyError:
+            print("No display available: cannot simulate keystroke.")
+            return False
 
         print("Simulating: LEFT arrow (Previous Slide)")
         pyautogui.press("left")
         return True
 
     def end_presentation(self) -> bool:
-        import pyautogui
+        try:
+            import pyautogui
+        except KeyError:
+            print("No display available: cannot simulate keystroke.")
+            return False
 
         print("Simulating: ESCAPE (End Presentation)")
         pyautogui.press("esc")
