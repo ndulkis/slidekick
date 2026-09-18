@@ -13,12 +13,13 @@ services:
       # Lando sets its own entrypoint, which clears the image's CMD, so the
       # keep-alive command has to be declared here. PYTHONPATH is what makes
       # `import slidekick` resolve to src/slidekick without an install step.
-      command: sleep infinity
+      command: uvicorn slidekick.api:app --host 0.0.0.0 --port 8000 --reload
       environment:
         PYTHONPATH: /app/src
 
     ports:
       - '5173:5173'
+      - '8000:8000'
 
 tooling:
   shell:
