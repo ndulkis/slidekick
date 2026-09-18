@@ -14,6 +14,14 @@ numpy
 # system libraries. Native webcam/GUI work happens on the host.
 opencv-python-headless
 
+# Sends the simulated keystrokes for the MVP keyboard adapter.
+pyautogui
+
+# Controller API: exposes the gesture endpoint the frontend calls, and runs
+# it as an ASGI server inside the container.
+fastapi
+uvicorn[standard]
+
 # Test and lint tooling
 pytest
 ruff
