@@ -250,11 +250,6 @@ def process_hand_detection(result, frame, position_history, last_swipe_time):
             hand_landmarks, position_history, last_swipe_time, current_time
         )
 
-        # #Temporary for Testing
-        # #Displays the standardized gesture event for prototype verification
-        # if gesture_event is not None:
-        #     print(gesture_event)
-
         landmark_points = get_landmark_points(hand_landmarks, frame)
 
         draw_hand_skeleton(frame, landmark_points)
@@ -286,8 +281,12 @@ def emit_event(event, event_handler):
 
 
 def print_recognition_event(event):
-    # Displays recognition events for prototype testing
-    print(event)
+    # Displays only gesture events for prototype testing
+    if event.get("event_type") == "gesture":
+        print(event)
+    # Displays onyl landmarks events for prototype testing
+    # if event.get("event_type") == "landmarks":
+    #   print(event)
 
 
 def run_camera(event_handler=None):
