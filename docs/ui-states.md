@@ -1,57 +1,258 @@
 # UI States
 
-States the dashboard needs to support, based on the shell built in SCRUM-76.
+This document defines the UI states for the SlideKick frontend. It is based
+on the dashboard shell built in SCRUM-76 and the research/design work from
+SCRUM-75.
 
-## Loading
+The current frontend has three routes:
 
-Not built yet. Right now every page renders instantly since there's no real
-data or camera feed being pulled in. Once the Session page talks to the
-gesture recognition backend, it needs a loading state while the camera/model
-starts up (spinner or skeleton, plus a message like "Starting camera...").
+- Dashboard
+- Session
+- Settings
 
-## Empty
+The Session page is the main gesture-control surface. This is where the user
+needs the clearest feedback about camera status, gesture recognition, session
+state, and presentation controls.
 
-Not built yet. Dashboard page will need an empty state for when there are no
-past sessions yet ("No sessions yet — start a presentation to see it here").
+Accessibility personas and requirements that inform the states below live in
+`docs/accessibility-personas.md`.
 
-## Error
+## Core session states
 
-Not built yet. Needs a state for when the camera can't be accessed, or the
-gesture recognition backend isn't reachable. Should show a plain error
-message and a retry option, not just a blank page or a console error.
+### Ready
 
-## Active / gesture-detected
+The Ready state means SlideKick has completed enough setup for the user to
+start a presentation session.
 
-Not built yet. This is the main state for the Session page — camera feed
-visible, current detected gesture shown, and slide controls responding to
-gestures in real time.
+The Session page should eventually communicate:
+
+- Camera availability
+- Gesture recognition readiness
+- Presentation connection status
+- Whether the session can be started
+
+Example:
+
+> SlideKick Ready
+>
+> Camera: Ready
+>
+> Recognition: Ready
+>
+> Presentation: Connected
+
+The user should have a clear action for starting the session.
+
+The Ready state should not rely only on a green indicator. A text label or
+other non-color indicator should also communicate the state.
+
+### Active
+
+The Active state means the presentation session is running and gestures can
+trigger presentation actions.
+
+The Session page should eventually show:
+
+- Camera or camera status
+- Recognition status
+- Current detected gesture
+- Presentation connection status
+- Feedback for the presentation action
+- A way to pause or end the session
+
+Example:
+
+> Gesture Recognition Is ON
+>
+> Swipe Right Detected
+>
+> Next Slide
+
+Gesture feedback should be noticeable without taking over the interface or
+making it difficult to follow the presentation.
+
+### Paused
+
+The Paused state means the session is still open, but gesture input should not
+trigger presentation commands.
+
+Example:
+
+> Gesture Recognition Paused
+>
+> Gestures will not control your presentation.
+
+The interface should provide a clear way to resume or end the session.
+
+Paused needs to be visually and textually different from Active. A user should
+not have to rely only on a color change to know whether gestures can currently
+control the presentation.
+
+### Error
+
+The Error state means something required by the current workflow has failed.
+
+Possible errors include:
+
+- Camera unavailable
+- Camera permission denied
+- Gesture recognition backend unavailable
+- Presentation disconnected
+- Session startup failure
+
+The UI should display a plain explanation of the problem instead of leaving the
+page blank or requiring the user to check the developer console.
+
+When possible, the error should also provide a recovery action.
+
+Examples:
+
+> Camera Not Available
+>
+> Check camera access and try again.
+>
+> Retry
+
+or:
+
+> Presentation Disconnected
+>
+> Reconnect the presentation before continuing.
+
+Error information should not rely only on red coloring.
+
+## Supporting states
+
+### Loading
+
+Loading is not implemented yet.
+
+Right now the pages render immediately because there is no real camera or
+recognition data being loaded.
+
+Once the Session page communicates with the camera and gesture recognition
+systems, the interface will need to show that startup work is happening.
+
+Possible messages include:
+
+> Starting camera...
+
+> Starting gesture recognition...
+
+A loading indicator should be accompanied by text so the user does not have to
+interpret an animation by itself.
+
+### Empty
+
+Empty states are not implemented yet.
+
+The Dashboard may eventually show previous sessions or other user data. If no
+data exists, the page should explain why the area is empty instead of appearing
+unfinished.
+
+Example:
+
+> No sessions yet.
+>
+> Start a presentation to see activity here.
+
+### No Gesture Detected
+
+During an Active session there may be long periods where no valid gesture is
+being performed.
+
+This should be treated as a normal state rather than an error.
+
+The UI may display a quiet message such as:
+
+> No Gesture Detected
+
+The user should not receive repeated warnings simply because they are not
+performing a gesture.
+
+### Gesture Detected
+
+When recognition reports a valid gesture, the interface should provide quick
+feedback.
+
+Example:
+
+> Swipe Left Detected
+>
+> Previous Slide
+
+The feedback should make it possible to understand both what SlideKick
+recognized and what presentation action resulted from it.
 
 ## Navigation states
 
-These exist already in the shell:
+These already exist in the SCRUM-76 shell.
 
-- Default: nav link not on the current page, plain text link.
-- Active: nav link for the current page, underlined/highlighted (see
-  `frontend/src/layout/Layout.css`, `.app-nav-link.active`).
-- Focused: nav link focused via keyboard, shows the browser's default focus
-  ring (see `docs/keyboard-nav-testing.md`).
+### Default
 
-## Accessibility personas
+A navigation link that is not the current page appears as a normal text link.
 
-People the UI states above need to work for:
+### Active
 
-- **Low-vision users** — need enough color contrast and focus indicators
-  that don't rely on color alone (the active nav state currently uses an
-  underline plus color, not color alone, which is good).
-- **Motor-impaired users** — need to be able to do everything with keyboard
-  only, no drag gestures or precise mouse clicks required for basic
-  navigation. Relevant since gesture control is the main feature but not
-  everyone can use gestures reliably, so keyboard/mouse fallback for the
-  dashboard itself matters.
-- **Keyboard-only users** — same as above, tab order needs to make sense and
-  every interactive element needs to be reachable and show visible focus.
+The navigation link for the current page is visually marked using an underline
+and color.
 
-This list is a starting point, not final — SCRUM-75 was meant to do a
-deeper pass on this before SCRUM-76/77 started, but the shell got built
-first since it was blocking SCRUM-77. Worth a follow-up ticket to expand
-this properly once there's a UI with real states to test against.
+See:
+
+`frontend/src/layout/Layout.css`
+
+`.app-nav-link.active`
+
+The underline is important because the active state does not depend only on
+color.
+
+### Focused
+
+A navigation link reached using the keyboard displays the browser's default
+focus outline.
+
+The current keyboard behavior is documented in:
+
+`docs/keyboard-nav-testing.md`
+
+## Low-fidelity user flow
+
+```text
+Launch SlideKick
+       |
+       v
+    Loading
+       |
+       v
+Check camera, recognition, presentation
+       |
+       +------ Problem ------> Error
+       |                        |
+       |                    Retry / Setup
+       |                        |
+       +------------------------+
+       |
+       v
+     Ready
+       |
+   Start Session
+       |
+       v
+     Active
+       |
+       +---- Gesture Detected ----> Show Gesture/Action Feedback
+       |                                  |
+       |                                  v
+       |                                Active
+       |
+       +---- Pause ----> Paused
+       |                  |
+       |                Resume
+       |                  |
+       +------------------+
+       |
+    End Session
+       |
+       v
+     Ready
+```
