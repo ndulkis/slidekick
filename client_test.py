@@ -1,5 +1,5 @@
-import urllib.request
 import urllib.error
+import urllib.request
 
 print("Sending GET request to Windows Helper at /next...")
 
