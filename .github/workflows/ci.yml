@@ -55,7 +55,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.lock
 
-      # `lando doctor` in CI mode: skips the container-only checks.
+      # `lando doctor` in CI mode: skips the container-only checks, since
+      # there's no Lando container here anymore.
       - name: Run environment doctor
         run: python scripts/check_env.py --ci
 
@@ -137,29 +138,17 @@ jobs:
       - name: Build
         run: npm run build
 
-  container-build:
-    name: Verify Docker Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # Verifies that a clean environment can still build the image Lando
-      # uses, which guards against "works on my machine" drift.
-      - name: Build SlideKick dev image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/dev/Dockerfile
-          push: false
-          tags: slidekick-dev:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+  # ---------------------------------------------------------------------------
+  # container-build was removed here as part of the Lando/Docker migration.
+  # It used to verify that a clean environment could still build the image
+  # Lando uses (docker/dev/Dockerfile). Without Lando, that image no longer
+  # backs local dev, so there's nothing left for this job to guard.
+  #
+  # The Dockerfile itself stays for now, since it's still the source of truth
+  # PYTHON_VERSION/NODE_VERSION above are kept in sync with (tests/environment
+  # checks this). If the Dockerfile is removed later, move that version
+  # source into this file directly and update tests/environment to match.
+  # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
   # OPTIONAL PRODUCTION-ONLY CHECKS
@@ -168,12 +157,15 @@ jobs:
   # production keeps them from slowing down every branch and pull request.
   # ---------------------------------------------------------------------------
 
-  # model-evaluation:
-  #   name: Model Regression Evaluation
+  # integration:
+  #   name: Integration Tests
   #   if: github.event_name == 'push' && github.ref == 'refs/heads/production'
   #   runs-on: ubuntu-latest
-  #   timeout-minutes: 20
-  #   needs: [quality, gesture-smoke-test, container-build]
+  #   timeout-minutes: 15
+  #   needs: [quality, gesture-smoke-test]
+  #
+  #   # tests/integration doesn't exist yet. Create it and remove this line
+  #   # before uncommenting the job below.
   #
   #   steps:
   #     - name: Check out repository
@@ -191,36 +183,8 @@ jobs:
   #         python -m pip install --upgrade pip
   #         pip install -r requirements.lock
   #
-  #     # Keep the CI validation dataset small and deterministic.
-  #     # Possible future checks:
-  #     # - recognition accuracy
-  #     # - false-positive rate
-  #     # - inference latency
-  #     - name: Evaluate model
-  #       run: |
-  #         python scripts/evaluate_model.py --dataset tests/data/ci_validation
-
-  # integration:
-  #   name: Integration Tests
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/production'
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 15
-  #   needs: [quality, gesture-smoke-test, container-build]
-  #
-  #   steps:
-  #     - name: Check out repository
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Build container
-  #       run: docker build -f docker/dev/Dockerfile -t slidekick-dev:ci .
-  #
-  #     # The image holds dependencies only, not source (Lando mounts the repo),
-  #     # so mount the checkout the same way.
-  #     #
   #     # Prefer mocked presentation controls and prerecorded camera data.
   #     # CI should not depend on a physical webcam, PowerPoint, Keynote, or
   #     # another desktop application being available.
   #     - name: Run integration tests
-  #       run: |
-  #         docker run --rm -v "$PWD":/app -w /app -e PYTHONPATH=/app/src \
-  #           slidekick-dev:ci python -m pytest -q tests/integration
+  #       run: python -m pytest -q tests/integration
