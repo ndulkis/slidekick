@@ -49,6 +49,7 @@ class GestureType(str, Enum):
     PREVIOUS = "previous"
     END = "end"
 
+
 @dataclass
 class RecognitionEvent:
     gesture: GestureType
