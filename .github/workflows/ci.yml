@@ -161,6 +161,21 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.lock
   # ---------------------------------------------------------------------------
   # OPTIONAL PRODUCTION-ONLY CHECKS
   #
