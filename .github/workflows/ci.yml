@@ -22,8 +22,8 @@ concurrency:
 permissions:
   contents: read
 
-# Keep these in step with docker/dev/Dockerfile so CI matches `lando` locally.
-# tests/environment fails if they drift apart.
+# The Python and Node versions the project targets, kept in step with
+# docker/dev/Dockerfile. tests/environment checks that these stay in sync.
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
@@ -137,6 +137,16 @@ jobs:
       # Includes `tsc -b`, so this is also the type check.
       - name: Build
         run: npm run build
+
+      # Makes the production bundle downloadable from the run's Summary
+      # page, and retrievable by a later job or workflow via
+      # actions/download-artifact. Kept for 14 days, then GitHub deletes it.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 14
 
   # ---------------------------------------------------------------------------
   # container-build was removed here as part of the Lando/Docker migration.
