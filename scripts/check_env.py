@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Check that the SlideKick Lando dev environment is set up correctly.
+"""Check that the SlideKick dev environment is set up correctly.
 
-Run it with `lando doctor`. It uses only the standard library, so it still
-gives a useful report when dependencies are missing or out of date.
+Run it with `PYTHONPATH=src python scripts/check_env.py` (or via
+scripts/verify.sh). It uses only the standard library, so it still gives a
+useful report when dependencies are missing or out of date.
 
-CI runs it with `--ci`, which skips the checks that only make sense inside
-the Lando container.
+CI runs it with `--ci`, which skips the frontend checks: the Python CI job
+doesn't install Node dependencies, and the frontend job covers them.
 """
 
 from __future__ import annotations
@@ -23,7 +24,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
-LANDO_APP_ROOT = Path("/app")
 
 PASS, WARN, FAIL = "pass", "warn", "fail"
 
@@ -39,15 +39,11 @@ class Result:
 # --- helpers -----------------------------------------------------------------
 
 
-def dockerfile_versions() -> tuple[str | None, str | None]:
-    """Return the (python, node major) versions the dev image is built with."""
-    text = (ROOT / "docker/dev/Dockerfile").read_text()
-    python = re.search(r"^FROM python:(\d+\.\d+)", text, re.MULTILINE)
-    node = re.search(r"deb\.nodesource\.com/setup_(\d+)\.x", text)
-    return (
-        python.group(1) if python else None,
-        node.group(1) if node else None,
-    )
+def pinned_versions() -> tuple[str, str]:
+    """Return the (python, node major) versions from .python-version and .nvmrc."""
+    python = (ROOT / ".python-version").read_text().strip()
+    node = (ROOT / ".nvmrc").read_text().strip().lstrip("v")
+    return python, node
 
 
 def locked_packages() -> dict[str, str]:
@@ -69,35 +65,17 @@ def run(cmd: list[str], cwd: Path = ROOT, timeout: int = 60):
 # --- checks ------------------------------------------------------------------
 
 
-def check_in_lando() -> Result:
-    name = "Running inside the Lando container"
-    if os.environ.get("LANDO") != "ON":
-        return Result(
-            FAIL,
-            name,
-            "LANDO is not set, so this looks like your host machine.",
-            "Run `lando doctor` instead of calling the script directly.",
-        )
-    if ROOT != LANDO_APP_ROOT:
-        return Result(
-            FAIL,
-            name,
-            f"Repo is at {ROOT}, expected {LANDO_APP_ROOT}.",
-            "Run `lando rebuild -y` from the repo root.",
-        )
-    return Result(PASS, name, f"repo mounted at {ROOT}")
-
-
 def check_python_version() -> Result:
-    expected, _ = dockerfile_versions()
+    expected, _ = pinned_versions()
     actual = f"{sys.version_info.major}.{sys.version_info.minor}"
-    name = "Python version matches the Dockerfile"
+    name = "Python version matches .python-version"
     if actual != expected:
         return Result(
             FAIL,
             name,
-            f"running {actual}, Dockerfile uses {expected}",
-            "Run `lando rebuild -y`.",
+            f"running {actual}, .python-version pins {expected}",
+            f"Install Python {expected} (e.g. `pyenv install {expected}`) and "
+            "recreate your virtualenv with it.",
         )
     return Result(PASS, name, actual)
 
@@ -114,8 +92,7 @@ def check_slidekick_importable() -> Result:
             FAIL,
             name,
             f"PYTHONPATH={os.environ.get('PYTHONPATH', '(unset)')}",
-            "PYTHONPATH should point at src/ (.lando.yml sets it to /app/src). "
-            "Run `lando rebuild -y`.",
+            "Run with `PYTHONPATH=src` from the repo root.",
         )
     return Result(PASS, name)
 
@@ -142,7 +119,7 @@ def check_python_packages() -> Result:
             FAIL,
             name,
             "\n".join(lines),
-            "The image is stale. Run `lando rebuild -y`.",
+            "Run `pip install -r requirements.lock` in your virtualenv.",
         )
     return Result(PASS, name, f"{len(locked_packages())} packages")
 
@@ -159,7 +136,12 @@ def check_opencv() -> Result:
         if not ok or decoded.shape != frame.shape:
             raise RuntimeError("PNG encode/decode round trip failed")
     except Exception as exc:  # noqa: BLE001 - report any failure to the user
-        return Result(FAIL, name, str(exc), "Run `lando rebuild -y`.")
+        return Result(
+            FAIL,
+            name,
+            str(exc),
+            "Run `pip install -r requirements.lock` in your virtualenv.",
+        )
     return Result(PASS, name, f"numpy {np.__version__}, opencv {cv2.__version__}")
 
 
@@ -171,17 +153,18 @@ def check_commands(commands: list[str], name: str, fix: str) -> Result:
 
 
 def check_node_version() -> Result:
-    name = "Node version matches the Dockerfile"
-    _, expected = dockerfile_versions()
+    name = "Node version matches .nvmrc"
+    _, expected = pinned_versions()
+    fix = f"Install Node {expected} (e.g. `nvm install` from the repo root)."
     if shutil.which("node") is None:
-        return Result(FAIL, name, "node not found", "Run `lando rebuild -y`.")
+        return Result(FAIL, name, "node not found", fix)
     actual = run(["node", "--version"]).stdout.strip()  # e.g. v20.19.2
     if actual.lstrip("v").split(".")[0] != expected:
         return Result(
             FAIL,
             name,
-            f"running {actual}, Dockerfile uses {expected}.x",
-            "Run `lando rebuild -y`.",
+            f"running {actual}, .nvmrc pins {expected}.x",
+            fix,
         )
     return Result(PASS, name, actual)
 
@@ -190,10 +173,13 @@ def check_node_modules() -> Result:
     name = "Frontend dependencies installed and match package-lock.json"
     if not (FRONTEND / "node_modules").is_dir():
         return Result(
-            FAIL, name, "frontend/node_modules is missing", "Run `lando npm ci`."
+            FAIL,
+            name,
+            "frontend/node_modules is missing",
+            "Run `npm --prefix frontend ci`.",
         )
     if shutil.which("npm") is None:
-        return Result(FAIL, name, "npm not found", "Run `lando rebuild -y`.")
+        return Result(FAIL, name, "npm not found", "Install Node (e.g. `nvm install`).")
     result = run(["npm", "ls", "--depth=0"], cwd=FRONTEND)
     if result.returncode != 0:
         problems = [
@@ -205,7 +191,7 @@ def check_node_modules() -> Result:
             FAIL,
             name,
             "\n".join(problems[:5]) or "npm ls reported problems",
-            "Run `lando npm ci`.",
+            "Run `npm --prefix frontend ci`.",
         )
     return Result(PASS, name)
 
@@ -224,8 +210,7 @@ def check_writable_dirs() -> Result:
             FAIL,
             name,
             ", ".join(problems),
-            "Restore the folders with `git checkout -- data models`, and make sure "
-            "Docker has file sharing access to the repo.",
+            "Restore the folders with `git checkout -- data models`.",
         )
     return Result(PASS, name)
 
@@ -233,15 +218,14 @@ def check_writable_dirs() -> Result:
 def check_git() -> Result:
     name = "git can read the repo"
     if shutil.which("git") is None:
-        return Result(WARN, name, "git not found", "Run `lando rebuild -y`.")
+        return Result(WARN, name, "git not found", "Install git.")
     result = run(["git", "rev-parse", "--is-inside-work-tree"])
     if result.returncode != 0:
         return Result(
             WARN,
             name,
             result.stderr.strip().splitlines()[0] if result.stderr else "",
-            "Run `lando shell` then `git config --global --add safe.directory /app`, "
-            "or use git from your host.",
+            "Run `git config --global --add safe.directory <repo path>`.",
         )
     return Result(PASS, name)
 
@@ -250,32 +234,25 @@ def check_python_tools() -> Result:
     return check_commands(
         ["ruff", "pytest", "pip-compile"],
         "Python dev tools on PATH",
-        "Run `lando rebuild -y`.",
+        "Run `pip install -r requirements.lock` in your virtualenv.",
     )
 
 
-def check_ffmpeg() -> Result:
-    return check_commands(["ffmpeg"], "ffmpeg on PATH", "Run `lando rebuild -y`.")
-
-
 SECTIONS = {
-    "Container": [check_in_lando],
     "Python": [
         check_python_version,
         check_slidekick_importable,
         check_python_packages,
         check_opencv,
         check_python_tools,
-        check_ffmpeg,
     ],
     "Frontend": [check_node_version, check_node_modules],
     "Project": [check_writable_dirs, check_git],
 }
 
-# Checks that depend on the Lando image rather than the repo. A CI runner
-# installs Python deps itself, has no ffmpeg, and the Python job doesn't
-# install frontend deps (the frontend job covers those).
-LANDO_ONLY = {check_in_lando, check_ffmpeg, check_node_version, check_node_modules}
+# Skipped with --ci: the Python CI job doesn't install frontend deps (the
+# frontend job covers those).
+FRONTEND_CHECKS = {check_node_version, check_node_modules}
 
 
 # --- output ------------------------------------------------------------------
@@ -286,7 +263,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--ci",
         action="store_true",
-        help="skip checks that only apply inside the Lando container",
+        help="skip the frontend checks, as the Python CI job does",
     )
     args = parser.parse_args(argv)
 
@@ -305,7 +282,7 @@ def main(argv: list[str] | None = None) -> int:
     print(paint("SlideKick environment check" + (" (CI mode)" if args.ci else ""), "1"))
     for section, checks in SECTIONS.items():
         if args.ci:
-            checks = [check for check in checks if check not in LANDO_ONLY]
+            checks = [check for check in checks if check not in FRONTEND_CHECKS]
             if not checks:
                 continue
         print(f"\n{paint(section, '1')}")
@@ -328,15 +305,9 @@ def main(argv: list[str] | None = None) -> int:
                 if result.fix:
                     print(f"      {paint('Fix:', '1')} {result.fix}")
 
-        # Outside the container every other check fails for the same reason,
-        # and their fixes would be misleading.
-        if section == "Container" and counts[FAIL]:
-            print(paint("\nStopping here: run this through Lando.", "31"))
-            return 1
-
     print(f"\n{counts[PASS]} passed, {counts[WARN]} warnings, {counts[FAIL]} failed")
     if counts[FAIL]:
-        rerun = "" if args.ci else " and run `lando doctor` again"
+        rerun = "" if args.ci else " and run this check again"
         print(paint(f"Environment is not ready. Apply the fixes above{rerun}.", "31"))
         return 1
     print(paint("Environment looks good.", "32"))
