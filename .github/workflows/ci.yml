@@ -169,6 +169,13 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for Gitleaks to scan commit history
+
+      - name: Secret Detection (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python 
         uses: actions/setup-python@v5
@@ -176,13 +183,28 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: requirements.lock
-      - name: Install pip-audit
+
+      - name: Install Security Tools (pip-audit & bandit)
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pip-audit
+          python -m pip install pip-audit bandit
 
-      - name: Scan Python dependencies
-        run: python -m pip_audit -r requirements.lock
+      - name: Scan Python dependencies (pip-audit)
+        run: python -m pip_audit -r requirements.lock --desc on
+
+      - name: SAST - Python Source Code (Bandit)
+        run: python -m bandit -r src/
+
+      - name: Set up Node for Frontend checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Scan Frontend dependencies (npm audit)
+        working-directory: frontend
+        run: npm audit || true
   # ---------------------------------------------------------------------------
   # OPTIONAL PRODUCTION-ONLY CHECKS
   #
