@@ -80,12 +80,3 @@ The diagram has no edge from Gesture Recognition Paused directly to Presentation
 2. Treat it as valid, a user should be able to end a presentation while paused without being forced to resume first.
 
 This needs a team decision before T2 implements `end()`, since the controller's validation logic depends on which way this goes. Until decided, this model treats `PAUSED -> END_SESSION` as invalid, the conservative reading of what's actually drawn.
-
-## Acceptance checklist
-
-- [x] All four states documented
-- [x] Valid transitions defined
-- [x] Invalid transitions defined
-- [x] UC10/UC6/UC7/UC8 mapped
-- [x] Event names and payload defined
-- [ ] Team reviews and agrees on the contract, including the open question above
