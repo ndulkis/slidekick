@@ -22,8 +22,12 @@ class InvalidTransitionError(Exception):
 
 class SessionController:
     def __init__(self) -> None:
-        self.state = SessionState.IDLE
+        self._state = SessionState.IDLE
         self.events = EventPublisher()
+
+    @property
+    def state(self) -> SessionState:
+        return self._state
 
     def subscribe(self, observer: Observer) -> None:
         self.events.subscribe(observer)
