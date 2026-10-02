@@ -1,4 +1,5 @@
-"""Guards against drift between the pinned versions, the lock file, and CI.
+"""Guards against drift between the pinned versions, the lock file, and CI, and
+checks that the configuration contract in .env.example matches config.py.
 
 .python-version and .nvmrc are the source of truth for the Python and Node
 versions. These tests run everywhere pytest does (locally and in CI), so they
@@ -8,6 +9,7 @@ scripts/check_env.py.
 
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -78,3 +80,48 @@ def test_numpy_and_opencv_round_trip_an_image():
 @pytest.mark.parametrize("command", ["ruff", "pytest", "pip-compile"])
 def test_dev_tool_on_path(command):
     assert shutil.which(command), f"{command} is not installed; check requirements.lock"
+
+
+# --- configuration -----------------------------------------------------------
+
+
+def test_env_example_exists():
+    assert (ROOT / ".env.example").is_file(), (
+        "Restore it with `git checkout -- .env.example`"
+    )
+
+
+@pytest.mark.parametrize("path", [".env", ".venv"])
+def test_local_environment_files_are_ignored_by_git(path):
+    result = subprocess.run(
+        ["git", "check-ignore", "--quiet", "--no-index", path], cwd=ROOT, check=False
+    )
+    assert result.returncode == 0, f"{path} must be listed in .gitignore"
+
+
+def test_env_example_documents_every_setting():
+    read_by_config = set(
+        re.findall(r'"(SLIDEKICK_\w+)"', read("src/slidekick/config.py"))
+    )
+    documented = set(
+        re.findall(r"^#?\s*(SLIDEKICK_\w+)=", read(".env.example"), re.MULTILINE)
+    )
+    assert read_by_config, "Couldn't find any SLIDEKICK_ settings in config.py"
+    assert read_by_config <= documented, (
+        f"Add to .env.example: {', '.join(sorted(read_by_config - documented))}"
+    )
+
+
+def test_env_example_has_no_real_values():
+    # Every setting is commented out or empty, so copying it never commits a value.
+    for line in read(".env.example").splitlines():
+        if line and not line.startswith("#"):
+            key, _, value = line.partition("=")
+            assert not value.strip(), f"{key} has a value in .env.example"
+
+
+def test_default_settings_are_valid_on_this_os():
+    from slidekick.config import load_settings
+
+    settings = load_settings(environ={}, env_file=ROOT / ".env.example")
+    assert settings.model_path.is_file(), f"Missing model: {settings.model_path}"
