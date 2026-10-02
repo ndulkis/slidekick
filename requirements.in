@@ -25,3 +25,5 @@ ruff
 
 # Provides pip-compile for regenerating requirements.lock.
 pip-tools
+
+pyautogui
