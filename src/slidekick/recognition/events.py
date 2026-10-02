@@ -1,8 +1,9 @@
-def create_gesture_event(gesture_name, timestamp):
+def create_gesture_event(gesture_name, confidence, timestamp):
     # Creates a standardized gesture event that can be used by others parts of SlideKick
     gesture_event = {
         "event_type": "gesture",
         "gesture": gesture_name,
+        "confidence": confidence,
         "timestamp": timestamp,
     }
 
