@@ -33,7 +33,7 @@ MAX_SWIPE_DURATION = (
 MIN_DIRECTION_CONSISTENCY = 0.75
 
 # Number of consecutive failed frame reads allowed before giving up
-MAX_FAILED_READS = 30  # Gives the camera time to warm up, since the first reads can fail on a cold start
+MAX_FAILED_READS = 30  # About 1 second with the 0.03 second wait between reads
 
 # Fix to prevent gesture from canceling when skeleton flickers
 HAND_LOSS_GRACE_FRAMES = 8
@@ -325,11 +325,13 @@ def run_camera(event_handler=None):
             if not success:
                 failed_reads += 1
 
-                # Only give up if the camera keeps failing, not on a single empty frame
+                # Give up after too many failed reads in a row
                 if failed_reads >= MAX_FAILED_READS:
                     print("Error: Could not read frame.")
                     break
 
+                # Waits briefly before trying again so the camera has time to warm up
+                time.sleep(0.03)
                 continue
 
             failed_reads = 0

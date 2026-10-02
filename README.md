@@ -142,7 +142,7 @@ Run these from the repo root with `.venv` active. The last column is the Lando c
 | `python -m pytest` | Run the Python tests | `lando test` |
 | `ruff check .` | Lint Python with Ruff | `lando lint` |
 | `ruff format .` | Format Python with Ruff | `lando format` |
-| `python src/slidekick/recognition/camera.py` | Run the camera and gesture-recognition prototype | |
+| `PYTHONPATH=src python -m slidekick.recognition.camera` | Run the camera and gesture-recognition prototype (macOS; see [Running the camera prototype](#running-the-camera-prototype) for Windows) | |
 | `npm --prefix frontend run dev` | Start the Vite dev server on port 5173 | `lando frontend-dev` |
 | `npm --prefix frontend run test` | Run the frontend tests | `lando frontend-test` |
 | `npm --prefix frontend run lint` | Lint the frontend with oxlint | `lando frontend-lint` |
@@ -165,11 +165,20 @@ MediaPipe is pinned below 1.0 (`mediapipe<1`) because 1.0.x crashes on startup o
 
 ## Running the camera prototype
 
+**macOS**
+
 ```bash
-python src/slidekick/recognition/camera.py
+PYTHONPATH=src python -m slidekick.recognition.camera
 ```
 
-Run it from the repo root. A window shows the camera feed with the detected hand skeleton. Press `q` or close the window to stop.
+**Windows (PowerShell)**
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m slidekick.recognition.camera
+```
+
+Run it from the repo root with `.venv` active. It has to run as a module (`-m`), not by file path, because `camera.py` imports the other files in `recognition/` as part of the package. A window shows the camera feed with the detected hand skeleton. Press `q` or close the window to stop.
 
 - **macOS:** allow camera access for your terminal in System Settings → Privacy & Security → Camera.
 - **Windows:** allow camera access in Settings → Privacy & security → Camera, including **Let desktop apps access your camera**.
