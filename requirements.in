@@ -17,7 +17,7 @@ opencv-python-headless
 
 # MediaPipe provides the hand landmark and gesture recognition pipeline used by
 # SlideKick for static gesture classification and landmark-based motion tracking.
-mediapipe
+mediapipe<1
 
 # Test and lint tooling
 pytest

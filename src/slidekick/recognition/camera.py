@@ -32,6 +32,9 @@ MAX_SWIPE_DURATION = (
 # Minimum percentage of frame movements that must travel in the same direction
 MIN_DIRECTION_CONSISTENCY = 0.75
 
+# Number of consecutive failed frame reads allowed before giving up
+MAX_FAILED_READS = 30  # Gives the camera time to warm up, since the first reads can fail on a cold start
+
 
 # Defines which hand landmarks should be connected to create the hand skeleton
 HAND_CONNECTIONS = [
@@ -303,6 +306,9 @@ def run_camera(event_handler=None):
     # Stores the time when the most recent swipe was detected
     last_swipe_time = 0
 
+    # Counts how many frame reads have failed in a row
+    failed_reads = 0
+
     if not camera.isOpened():
         print("Error: Could not open camera.")
         return
@@ -313,8 +319,16 @@ def run_camera(event_handler=None):
             success, frame = camera.read()
 
             if not success:
-                print("Error: Could not read frame.")
-                break
+                failed_reads += 1
+
+                # Only give up if the camera keeps failing, not on a single empty frame
+                if failed_reads >= MAX_FAILED_READS:
+                    print("Error: Could not read frame.")
+                    break
+
+                continue
+
+            failed_reads = 0
 
             frame, mp_image = convert_frame_to_mediapipe(frame)
 

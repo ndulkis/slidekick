@@ -238,6 +238,45 @@ def check_python_tools() -> Result:
     )
 
 
+def check_configuration() -> Result:
+    name = "Configuration is valid (.env and environment variables)"
+    try:
+        from slidekick.config import ConfigError, load_settings
+    except ImportError as exc:
+        return Result(
+            FAIL, name, str(exc), "Run with `PYTHONPATH=src` from the repo root."
+        )
+    try:
+        settings = load_settings()
+    except ConfigError as exc:
+        return Result(
+            FAIL,
+            name,
+            str(exc),
+            "Fix these values in your .env or environment. "
+            "See .env.example for the allowed values.",
+        )
+    if not settings.model_path.is_file():
+        return Result(
+            FAIL,
+            name,
+            f"model not found: {settings.model_path}",
+            "Restore it with `git checkout -- models`, or fix SLIDEKICK_MODEL_PATH.",
+        )
+    return Result(
+        PASS,
+        name,
+        f"{settings.platform}, camera backend {settings.camera_backend}",
+    )
+
+
+def check_env_example() -> Result:
+    name = ".env.example exists"
+    if not (ROOT / ".env.example").is_file():
+        return Result(FAIL, name, "", "Restore it with `git checkout -- .env.example`.")
+    return Result(PASS, name)
+
+
 SECTIONS = {
     "Python": [
         check_python_version,
@@ -247,6 +286,7 @@ SECTIONS = {
         check_python_tools,
     ],
     "Frontend": [check_node_version, check_node_modules],
+    "Configuration": [check_env_example, check_configuration],
     "Project": [check_writable_dirs, check_git],
 }
 
