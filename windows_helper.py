@@ -18,7 +18,7 @@ adapter = KeyboardPresentationAdapter()
 
 @app.route("/next", methods=["GET"])
 def trigger_next():
-    print("Command received from Docker container!")
+    print("Command received: next slide")
     adapter.next_slide()
     return "Success", 200
 

@@ -23,7 +23,7 @@ permissions:
   contents: read
 
 # The Python and Node versions the project targets, kept in step with
-# docker/dev/Dockerfile. tests/environment checks that these stay in sync.
+# .python-version and .nvmrc. tests/environment checks that these stay in sync.
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Same as .lando.yml, so `import slidekick` resolves to src/slidekick.
+    # Same as scripts/verify.sh, so `import slidekick` resolves to src/slidekick.
     env:
       PYTHONPATH: src
 
@@ -49,14 +49,13 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.lock
 
-      # Same lock file the Lando image installs.
+      # Same lock file developers install into their .venv.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.lock
 
-      # `lando doctor` in CI mode: skips the container-only checks, since
-      # there's no Lando container here anymore.
+      # CI mode skips the frontend checks; the frontend job covers those.
       - name: Run environment doctor
         run: python scripts/check_env.py --ci
 
@@ -66,7 +65,8 @@ jobs:
       - name: Check formatting
         run: ruff format --check .
 
-      # Version drift between the Dockerfile, ci.yml, and requirements.lock.
+      # Version drift between .python-version, .nvmrc, ci.yml, and
+      # requirements.lock.
       - name: Run environment tests
         run: python -m pytest -q tests/environment
 
@@ -149,15 +149,7 @@ jobs:
           retention-days: 14
 
   # ---------------------------------------------------------------------------
-  # container-build was removed here as part of the Lando/Docker migration.
-  # It used to verify that a clean environment could still build the image
-  # Lando uses (docker/dev/Dockerfile). Without Lando, that image no longer
-  # backs local dev, so there's nothing left for this job to guard.
-  #
-  # The Dockerfile itself stays for now, since it's still the source of truth
-  # PYTHON_VERSION/NODE_VERSION above are kept in sync with (tests/environment
-  # checks this). If the Dockerfile is removed later, move that version
-  # source into this file directly and update tests/environment to match.
+  # SECURITY CHECKS
   # ---------------------------------------------------------------------------
 
   security:
@@ -176,7 +168,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python 
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}

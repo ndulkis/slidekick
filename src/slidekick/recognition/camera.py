@@ -18,6 +18,23 @@ MODEL_PATH = "models/gesture_recognizer.task"
 WINDOW_WIDTH = 960
 WINDOW_HEIGHT = 540
 
+# Minimum horizontal movement required to count as a potential swipe
+SWIPE_THRESHOLD = 0.20  # 0.20 x 640 = 128 pixels (We keep value as normalize coordinate distance to be compatible to different resolutions)
+
+# Defines how long the system must wait before another swipe can be detected
+SWIPE_COOLDOWN = 0.75
+
+# Maximum amount of time allowed for a hand movement to count as a swipe
+MAX_SWIPE_DURATION = (
+    0.50  # Helps differentiate between intentional swipes and repositioning
+)
+
+# Minimum percentage of frame movements that must travel in the same direction
+MIN_DIRECTION_CONSISTENCY = 0.75
+
+# Number of consecutive failed frame reads allowed before giving up
+MAX_FAILED_READS = 30  # About 1 second with the 0.03 second wait between reads
+
 # Fix to prevent gesture from canceling when skeleton flickers
 HAND_LOSS_GRACE_FRAMES = 8
 
@@ -289,6 +306,9 @@ def run_camera(event_handler=None):
     # Stores how many frames skeleton has been missing for
     missed_hand_frames = 0
 
+    # Counts how many frame reads have failed in a row
+    failed_reads = 0
+
     if not camera.isOpened():
         print("Error: Could not open camera.")
         return
@@ -303,8 +323,18 @@ def run_camera(event_handler=None):
             success, frame = camera.read()
 
             if not success:
-                print("Error: Could not read frame.")
-                break
+                failed_reads += 1
+
+                # Give up after too many failed reads in a row
+                if failed_reads >= MAX_FAILED_READS:
+                    print("Error: Could not read frame.")
+                    break
+
+                # Waits briefly before trying again so the camera has time to warm up
+                time.sleep(0.03)
+                continue
+
+            failed_reads = 0
 
             frame, mp_image = convert_frame_to_mediapipe(frame)
 
