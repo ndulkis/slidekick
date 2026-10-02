@@ -11,7 +11,7 @@ ADAPTER_MODULE = "slidekick.presentation_adapter"
 def fake_pyautogui():
     """Stand in for pyautogui so adapter code runs without a display.
 
-    pyautogui needs a real display to import, which neither Lando nor CI has.
+    pyautogui needs a real display to import, which CI doesn't have.
     Tests assert on the keys pressed instead of pressing them.
     """
     fake = mock.MagicMock(name="pyautogui")

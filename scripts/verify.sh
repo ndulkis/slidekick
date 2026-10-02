@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Check the environment, then run everything CI runs (except the Docker
-# build) and print a summary. Run it with `lando verify`.
+# Check the environment, then run everything CI runs and print a summary.
+# Run it from your activated virtualenv with `./scripts/verify.sh`.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
+
+# Same as CI, so `import slidekick` resolves to src/slidekick.
+export PYTHONPATH=src
 
 steps=()
 failed=0

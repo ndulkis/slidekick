@@ -6,10 +6,10 @@ from collections import (
 
 import cv2  # OpenCV for webcam capture and frame processing
 import mediapipe as mp  # Google's MediaPipe for gesture recognition and hand landmark detection
-from events import (
-    create_gesture_event,
-    create_landmark_event,
-)  # Creates standardized SlideKick gesture and landmark event payloads
+
+from .events import create_landmark_event
+from .sample_recorder import SampleRecorder
+from .swipe_recognizer import detect_swipe
 
 # Gesture Recognizer Task Model Path
 MODEL_PATH = "models/gesture_recognizer.task"
@@ -32,6 +32,11 @@ MAX_SWIPE_DURATION = (
 # Minimum percentage of frame movements that must travel in the same direction
 MIN_DIRECTION_CONSISTENCY = 0.75
 
+# Number of consecutive failed frame reads allowed before giving up
+MAX_FAILED_READS = 30  # About 1 second with the 0.03 second wait between reads
+
+# Fix to prevent gesture from canceling when skeleton flickers
+HAND_LOSS_GRACE_FRAMES = 8
 
 # Defines which hand landmarks should be connected to create the hand skeleton
 HAND_CONNECTIONS = [
@@ -78,10 +83,14 @@ def create_camera_window():
 
 
 def create_recognizer_options():
-    # Configures MediaPipe to use the Gesture Recognizer model in image-processing mode
+    # VIDEO mode allows MediaPipe to track the hand across consecutive frames
     options = mp.tasks.vision.GestureRecognizerOptions(
         base_options=mp.tasks.BaseOptions(model_asset_path=MODEL_PATH),
-        running_mode=mp.tasks.vision.RunningMode.IMAGE,
+        running_mode=mp.tasks.vision.RunningMode.VIDEO,
+        num_hands=1,
+        min_hand_detection_confidence=0.40,
+        min_hand_presence_confidence=0.40,
+        min_tracking_confidence=0.40,
     )
 
     return options
@@ -98,90 +107,6 @@ def convert_frame_to_mediapipe(frame):
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
     return frame, mp_image
-
-
-def detect_swipe(hand_landmarks, position_history, last_swipe_time, current_time):
-    # Stores a gesture event if a valid swipe is detected
-    gesture_event = None
-
-    # Uses landmark 9 (base of middle finger) near the center of the hand to track hand movement
-    tracked_landmark = hand_landmarks[9]
-
-    # Stores the time and horizontal position of the tracked Landmark
-    position_history.append((current_time, tracked_landmark.x))
-
-    if len(position_history) > 1:
-        # Get the oldest and newest recorded time and horizontal positions
-        starting_time, starting_x = position_history[0]
-        ending_time, ending_x = position_history[-1]
-
-        # Calculates how far the hand moved horizontally
-        x_displacement = ending_x - starting_x
-
-        # Calculates how long the hand movement took
-        movement_duration = ending_time - starting_time
-
-        # Stores the horizontal movement between each recorded frame
-        frame_movements = []  # A swipe should look like "0.30 -> 0.35 -> 0.41 -> 0.48 -> 0.56 -> 0.64"
-        # A non swipe would look like "+0.05 -> -0.03 -> +0.07 -> -0.04 -> +0.06"
-
-        for index in range(1, len(position_history)):
-            previous_x = position_history[index - 1][1]
-            current_x = position_history[index][1]
-
-            frame_movements.append(current_x - previous_x)
-
-        # Counts how many recorded movements traveled right or left
-        right_movements = sum(movement > 0 for movement in frame_movements)
-
-        left_movements = sum(movement < 0 for movement in frame_movements)
-
-        # Calculate the percentage of movements traveling in each direction
-        right_consistency = right_movements / len(frame_movements)
-        left_consistency = left_movements / len(frame_movements)
-
-        # Checks whether the movement happened quickly enough to be considered a swipe
-        valid_duration = movement_duration <= MAX_SWIPE_DURATION
-
-        # Checks whether enough time has passed since the previous detected swipe
-        cooldown_complete = ending_time - last_swipe_time >= SWIPE_COOLDOWN
-
-        # Checks if the hand moved far enough horizontally to count as a potential swipe
-        if (
-            x_displacement >= SWIPE_THRESHOLD
-            and right_consistency >= MIN_DIRECTION_CONSISTENCY
-            and valid_duration
-            and cooldown_complete
-        ):
-            # Creates a standardized SlideKick event for the detected right Swipe
-            gesture_event = create_gesture_event("swipe_right", ending_time)
-
-            last_swipe_time = ending_time
-
-            # Once swipe is accepted, clear and start measuring new motion
-            position_history.clear()
-
-        elif (
-            x_displacement <= -SWIPE_THRESHOLD
-            and left_consistency >= MIN_DIRECTION_CONSISTENCY
-            and valid_duration
-            and cooldown_complete
-        ):
-            # Creates a standardize SlideKick event for the detected left swipe
-            gesture_event = create_gesture_event("swipe_left", ending_time)
-
-            last_swipe_time = ending_time
-
-            # Once swipe is accepted, clear and start measuring new motion
-            position_history.clear()
-
-    # Return should look like
-    #     No swipe:
-    #     (None, 0)
-    # or
-    #     Right swipe:
-    #     ({"event_type": "gesture", ...}, 12345.6)
-    return gesture_event, last_swipe_time
 
 
 def get_landmark_points(hand_landmarks, frame):
@@ -229,13 +154,67 @@ def draw_hand_skeleton(frame, landmark_points):
         cv2.circle(frame, point, circle_radius, circle_color, circle_thickness)
 
 
-def process_hand_detection(result, frame, position_history, last_swipe_time):
+def draw_recognition_diagnostic(
+    frame,
+    gesture_name,
+    confidence,
+    recognition_enabled=True,
+):
+    status = "ON" if recognition_enabled else "OFF"
+
+    text_x = 20
+    recognition_text_y = 30
+    gesture_text_y = 60
+    confidence_text_y = 90
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.7
+    text_color = (255, 255, 255)
+    text_thickness = 2
+
+    cv2.putText(
+        frame,
+        f"Recognition: {status}",
+        (text_x, recognition_text_y),
+        font,
+        font_scale,
+        text_color,
+        text_thickness,
+    )
+
+    cv2.putText(
+        frame,
+        f"Gesture: {gesture_name}",
+        (text_x, gesture_text_y),
+        font,
+        font_scale,
+        text_color,
+        text_thickness,
+    )
+
+    cv2.putText(
+        frame,
+        f"Confidence: {confidence:.2f}",
+        (text_x, confidence_text_y),
+        font,
+        font_scale,
+        text_color,
+        text_thickness,
+    )
+
+
+def process_hand_detection(
+    result, frame, position_history, last_swipe_time, missed_hand_frames
+):
     # Stores standardized recognition events generated during the current frame
     gesture_event = None
     landmark_event = None
 
     # Checks whether MediaPipe detected hand landmarks
     if result.hand_landmarks:
+        # Hand was found again, so reset the missed-frame counter
+        missed_hand_frames = 0
+
         # Gets the 21 hand landmarks from the first detected hand
         hand_landmarks = result.hand_landmarks[0]
 
@@ -255,16 +234,17 @@ def process_hand_detection(result, frame, position_history, last_swipe_time):
         draw_hand_skeleton(frame, landmark_points)
 
     else:
-        # Clears old movement data when the hand is no longer detected
-        position_history.clear()
+        # If skeleton disappeared for one frame increment
+        missed_hand_frames += 1
 
-    return gesture_event, landmark_event, last_swipe_time
+        # Clears old movement data when the hand is no longer detected for multiple consecutive frames
+        if missed_hand_frames >= HAND_LOSS_GRACE_FRAMES:
+            position_history.clear()
+
+    return gesture_event, landmark_event, last_swipe_time, missed_hand_frames
 
 
-def should_close_window(window_name):
-    # waitKey also allows OpenCV to process window events.
-    key = cv2.waitKey(1) & 0xFF
-
+def should_close_window(window_name, key):
     # Press Q to close the camera.
     if key == ord("q"):
         return True
@@ -295,13 +275,39 @@ def run_camera(event_handler=None):
     # 0 tells OpenCV to use the computer's default webcam.
     camera = cv2.VideoCapture(0)
 
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    camera.set(cv2.CAP_PROP_FPS, 30)
+
     options = create_recognizer_options()
 
-    # Stores the most recent positions of the tracked hand landmark
-    position_history = deque(maxlen=10)  # Keep track at most 10 frames of history
+    # Stores the most recent positions of the tracked hand landmark (timestamp, x, y)
+    position_history: deque[tuple[float, float, float]] = deque(
+        maxlen=45
+    )  # Keep track at most 45 frames of history
+
+    # TOP(TEST) Used for S2 testing sample recorder
+    sample_recorder = SampleRecorder("data/evaluation/s2_recognition_samples.jsonl")
+
+    evaluation_labels = [
+        "swipe_right",
+        "swipe_left",
+        "no_gesture",
+    ]
+
+    evaluation_index = sample_recorder.next_label_index
+    pending_expected_gesture = None
+
+    # BOTTOM(TEST)
 
     # Stores the time when the most recent swipe was detected
-    last_swipe_time = 0
+    last_swipe_time = 0.0
+
+    # Stores how many frames skeleton has been missing for
+    missed_hand_frames = 0
+
+    # Counts how many frame reads have failed in a row
+    failed_reads = 0
 
     if not camera.isOpened():
         print("Error: Could not open camera.")
@@ -309,29 +315,112 @@ def run_camera(event_handler=None):
 
     # Creates the MediaPipe Gesture Recognizer using the configured model and recognition settings
     with mp.tasks.vision.GestureRecognizer.create_from_options(options) as recognizer:
+        last_frame_time_stamp_ms = -1
+        last_gesture_name = "none"
+        last_gesture_confidence = 0.0
+
         while True:
             success, frame = camera.read()
 
             if not success:
-                print("Error: Could not read frame.")
-                break
+                failed_reads += 1
+
+                # Give up after too many failed reads in a row
+                if failed_reads >= MAX_FAILED_READS:
+                    print("Error: Could not read frame.")
+                    break
+
+                # Waits briefly before trying again so the camera has time to warm up
+                time.sleep(0.03)
+                continue
+
+            failed_reads = 0
 
             frame, mp_image = convert_frame_to_mediapipe(frame)
 
-            # Processes the MediaPipe image and returns detection results
-            result = recognizer.recognize(mp_image)
+            frame_timestamp_ms = int(time.monotonic() * 1000)
 
-            gesture_event, landmark_event, last_swipe_time = process_hand_detection(
-                result, frame, position_history, last_swipe_time
+            if frame_timestamp_ms <= last_frame_time_stamp_ms:
+                frame_timestamp_ms = last_frame_time_stamp_ms + 1
+
+            last_frame_time_stamp_ms = frame_timestamp_ms
+
+            # Processes the MediaPipe image and returns detection results
+            result = recognizer.recognize_for_video(mp_image, frame_timestamp_ms)
+
+            gesture_event, landmark_event, last_swipe_time, missed_hand_frames = (
+                process_hand_detection(
+                    result, frame, position_history, last_swipe_time, missed_hand_frames
+                )
             )
+
+            # TOP TEST
+            if (
+                pending_expected_gesture is not None
+                and sample_recorder.active_sample is None
+                and landmark_event is not None
+            ):
+                sample_recorder.start_sample(
+                    pending_expected_gesture,
+                    landmark_event["timestamp"],
+                )
+
+                print(f"Hand detected. Recording: {pending_expected_gesture}")
+
+                pending_expected_gesture = None
+
+            if sample_recorder.active_sample is not None:
+                if landmark_event is not None:
+                    sample_recorder.record_landmarks(landmark_event)
+
+                if gesture_event is not None:
+                    sample_recorder.record_prediction(gesture_event)
+
+                current_time = time.monotonic()
+
+                if sample_recorder.should_finish_sample(current_time):
+                    sample_recorder.finish_sample(current_time)
+                    evaluation_index = sample_recorder.next_label_index
+            # BOTTOM TEST
+
+            # (TEST) Used for S2 Testing
+
+            if gesture_event is not None:
+                last_gesture_name = gesture_event["gesture"]
+                last_gesture_confidence = gesture_event["confidence"]
 
             # Sends detected gesture and landmark events through the recognition interface
             emit_event(gesture_event, event_handler)
             emit_event(landmark_event, event_handler)
 
+            # Prompts inside camera window recognition diagnostic
+            draw_recognition_diagnostic(
+                frame, last_gesture_name, last_gesture_confidence
+            )
+
             cv2.imshow(window_name, frame)
 
-            if should_close_window(window_name):
+            # TOP TEST
+            # S2 evaluation controls
+            key = cv2.waitKey(1) & 0xFF
+
+            if (
+                key == ord(" ")
+                and sample_recorder.active_sample is None
+                and pending_expected_gesture is None
+            ):
+                pending_expected_gesture = evaluation_labels[evaluation_index]
+
+                position_history.clear()
+                last_swipe_time = 0.0
+
+                print(
+                    f"Sample {evaluation_index + 1}/{len(evaluation_labels)} armed: "
+                    f"{pending_expected_gesture}. Waiting for hand..."
+                )
+            # BOTTOM TEST
+
+            if should_close_window(window_name, key):
                 break
 
     camera.release()

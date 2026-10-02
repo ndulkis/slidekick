@@ -1,6 +1,6 @@
 # Observer Event Contract Draft
 
-**Status:** Sprint 1 draft
+**Status:** Sprint 2 draft
 **Owner:** Project team
 
 ## Purpose
@@ -48,15 +48,24 @@ Rules:
 
 ## Observer boundary
 
-The recognition provider publishes or returns `RecognitionEvent` values. The controller is the observer/consumer of those values. The controller is responsible for:
+### Recognition → Controller
 
-- validating or relying on the typed event contract;
-- mapping supported gestures to normalized commands;
-- ignoring `none` events;
-- invoking the configured `PresentationAdapter`;
-- returning a `CommandEvent` for successful command mapping.
+The recognition provider publishes or returns `RecognitionEvent` values.
+The controller consumes these events and maps supported gestures to
+normalized presentation commands.
 
-The recognition provider must not import or call a presentation adapter. The UI must not call `pyautogui` or any presentation adapter directly.
+### Session Controller → Subscribers
+
+The session controller publishes `SessionEvent` values after successful
+state transitions.
+
+Subscribers may include:
+- React UI
+- recognition/session coordination
+- other components that need session-state updates
+
+Subscribers must not directly mutate session state through the event.
+Session state changes must go through the session controller.
 
 ## Current Sprint 1 flow
 
