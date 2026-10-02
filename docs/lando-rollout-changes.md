@@ -11,7 +11,7 @@ Installs Python 3.11 and the packages pinned in `requirements.lock`, sets `PYTHO
 - `scripts/check_env.py --ci`, confirms the Python version, installed packages, and project layout are consistent
 - `ruff check`, lint
 - `ruff format --check`, formatting
-- `pytest tests/environment`, checks the pinned versions in this file, `requirements.lock`, and `docker/dev/Dockerfile` haven't drifted apart
+- `pytest tests/environment`, checks the pinned versions in this file, `requirements.lock`, `.python-version`, and `.nvmrc` haven't drifted apart
 - `pytest tests/unit`
 
 **gesture-smoke-test**

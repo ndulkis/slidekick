@@ -7,7 +7,7 @@ How to go from a clean checkout to a validated build, without Lando or Docker.
 - Python 3.11
 - Node 20
 
-These are pinned in `docker/dev/Dockerfile` (still the source of truth for local dev) and mirrored in `.github/workflows/ci.yml` as `PYTHON_VERSION` and `NODE_VERSION`. `tests/environment/test_environment.py` checks the two stay in sync, so if one changes, update the other in the same PR.
+These are pinned in `.python-version` and `.nvmrc` (the source of truth) and mirrored in `.github/workflows/ci.yml` as `PYTHON_VERSION` and `NODE_VERSION`. `tests/environment/test_environment.py` checks they stay in sync, so if one changes, update the other in the same PR.
 
 ## Backend
 
@@ -30,7 +30,7 @@ python -m pytest -q tests/unit
 python -m pytest -q tests/smoke
 ```
 
-`check_env.py --ci` skips the checks that only apply inside a container (being in Lando, ffmpeg, Node/frontend state); everything else runs the same locally and in CI.
+`check_env.py --ci` skips the Node/frontend checks, since the frontend job covers those; everything else runs the same locally and in CI.
 
 ## Frontend
 
