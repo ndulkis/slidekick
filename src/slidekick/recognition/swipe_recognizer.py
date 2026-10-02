@@ -29,7 +29,8 @@ TOTAL_CONFIDENCE_WEIGHT = (
     DISPLACEMENT_WEIGHT + DIRECTION_WEIGHT + AXIS_PURITY_WEIGHT + DURATION_WEIGHT
 )
 
-assert abs(TOTAL_CONFIDENCE_WEIGHT - 1.0) < 1e-9
+if abs(TOTAL_CONFIDENCE_WEIGHT - 1.0) >= 1e-9:
+    raise ValueError("Confidence weights must sum to 1.0")
 
 
 def clamp(value):
