@@ -200,7 +200,7 @@ You have 3 seconds to click into an open presentation. It should move forward on
 | --- | --- |
 | Lint and Unit Tests | `check_env.py --ci`, `ruff check`, `ruff format --check`, `tests/environment`, `tests/unit` |
 | Gesture Smoke Tests | `tests/smoke` |
-| Frontend | oxlint, Vitest, a production build (which also type-checks), and uploads the build as the `frontend-dist` artifact |
+| Frontend | oxlint, an explicit TypeScript type check, Vitest, a production build, and uploads the build as the `frontend-dist` artifact |
 | Security Checks | Gitleaks (committed secrets), pip-audit (Python dependency vulnerabilities), Bandit (Python source in `src/`), and `npm audit` (report only, doesn't fail the job) |
 
 Integration tests are stubbed out at the bottom of the workflow. When enabled, they run only on pushes to `production`.
