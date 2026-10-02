@@ -22,8 +22,7 @@ concurrency:
 permissions:
   contents: read
 
-# The Python and Node versions the project targets, kept in step with
-# docker/dev/Dockerfile. tests/environment checks that these stay in sync.
+# Python and Node versions used by the CI environment.
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
@@ -34,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Same as .lando.yml, so `import slidekick` resolves to src/slidekick.
+    # PYTHONPATH allows `import slidekick` to resolve to src/slidekick.
     env:
       PYTHONPATH: src
 
@@ -49,14 +48,13 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.lock
 
-      # Same lock file the Lando image installs.
+      # Install the exact dependency versions committed in requirements.lock.
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.lock
 
-      # `lando doctor` in CI mode: skips the container-only checks, since
-      # there's no Lando container here anymore.
+      # Run environment checks that are applicable to CI.
       - name: Run environment doctor
         run: python scripts/check_env.py --ci
 
