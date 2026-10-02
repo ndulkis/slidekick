@@ -71,9 +71,7 @@ class KeyboardPresentationAdapter(PresentationAdapter):
             "resume": self.resume_presentation,
         }
 
-        normalized_command = (
-            command.strip().lower() if isinstance(command, str) else ""
-        )
+        normalized_command = command.strip().lower() if isinstance(command, str) else ""
 
         action = commands.get(normalized_command)
 
