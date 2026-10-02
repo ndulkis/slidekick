@@ -7,7 +7,12 @@ How to go from a clean checkout to a validated build, without Lando or Docker.
 - Python 3.11
 - Node 20
 
-These are pinned in `docker/dev/Dockerfile` (still the source of truth for local dev) and mirrored in `.github/workflows/ci.yml` as `PYTHON_VERSION` and `NODE_VERSION`. `tests/environment/test_environment.py` checks the two stay in sync, so if one changes, update the other in the same PR.
+CI uses these versions through `.github/workflows/ci.yml`.
+Python dependencies are pinned through `requirements.lock`, and frontend
+dependencies are pinned through `frontend/package-lock.json`.
+
+The Dockerfile may remain temporarily for compatibility with existing
+environment checks, but it is no longer used by the CI build.
 
 ## Backend
 
