@@ -23,9 +23,9 @@ The current browser demonstration uses a deterministic placeholder recognition f
 
 | Boundary | Owns | Must not own |
 |---|---|---|
-| React UI | Session state, user-visible controls, accessibility states | `pyautogui`, model inference, adapter implementation |
+| React UI | User-visible controls, accessibility states, rendering session state | `pyautogui`, model inference, adapter implementation, owning session state |
 | Recognition | Producing `RecognitionEvent` values | Presentation side effects or command execution |
-| Controller | Gesture-to-command mapping and adapter invocation | Camera capture or UI rendering |
+| Controller | Gesture-to-command mapping, adapter invocation, session state ownership and transitions | Camera capture or UI rendering |
 | Presentation adapter | Translating normalized commands into app-specific actions | Gesture interpretation or UI state |
 | Evidence/docs | Setup, risks, traceability, review records | Runtime business logic |
 
@@ -34,6 +34,8 @@ The current browser demonstration uses a deterministic placeholder recognition f
 Recognition events contain `gesture`, `confidence` in `[0, 1]`, and `source`. Command events contain a normalized command, source gesture, and metadata. `Gesture.NONE` produces no command.
 
 The detailed contract is documented in [Observer Event Contract](observer-event-contract.md).
+
+**Sprint 2 addition:** session state (idle, running, paused, ended) is owned by a new session controller, which validates transitions and publishes a `SessionEvent` on each change. See [Session State Model](session-state-model.md) for the full state machine and its mapping to UC10, UC6, UC7, and UC8. This is separate from the gesture-to-command controller in PR #10; the two are independent observers of each other's events, not one built on the other.
 
 ## MVP scope
 

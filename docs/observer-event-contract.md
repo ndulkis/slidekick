@@ -1,6 +1,6 @@
 # Observer Event Contract Draft
 
-**Status:** Sprint 1 draft
+**Status:** Sprint 2 draft
 **Owner:** Project team
 
 ## Purpose
@@ -29,17 +29,43 @@ Rules:
 | `source_gesture` | `Gesture` | Yes | Gesture that caused the command |
 | `metadata` | `object \| null` | No | Diagnostic information, including confidence and source |
 
+## SessionEvent
+
+Published by the session controller when a session transitions between states. See [Session State Model](session-state-model.md) for the full state machine, valid and invalid transitions, and the UC10/UC6/UC7/UC8 mapping this is built from.
+
+| Field | Type | Required | Contract |
+|---|---|---:|---|
+| `type` | `SessionEventType` | Yes | `session_started`, `session_paused`, `session_resumed`, or `session_ended` |
+| `previous_state` | `SessionState` | Yes | The state the session was in before this transition |
+| `new_state` | `SessionState` | Yes | The state the session is in after this transition |
+| `use_case` | `string` | Yes | The UC ID that triggered the transition, e.g. `"UC10"` |
+
+Rules:
+
+1. Only published after a transition has been validated and applied; an invalid transition attempt does not publish an event.
+2. `previous_state` and `new_state` must always differ; an event describes a change, not a no-op.
+3. Subscribers (UI, recognition, presentation adapter) read this event to react to session state without needing to know how the controller decided to change it.
+
 ## Observer boundary
 
-The recognition provider publishes or returns `RecognitionEvent` values. The controller is the observer/consumer of those values. The controller is responsible for:
+### Recognition → Controller
 
-- validating or relying on the typed event contract;
-- mapping supported gestures to normalized commands;
-- ignoring `none` events;
-- invoking the configured `PresentationAdapter`;
-- returning a `CommandEvent` for successful command mapping.
+The recognition provider publishes or returns `RecognitionEvent` values.
+The controller consumes these events and maps supported gestures to
+normalized presentation commands.
 
-The recognition provider must not import or call a presentation adapter. The UI must not call `pyautogui` or any presentation adapter directly.
+### Session Controller → Subscribers
+
+The session controller publishes `SessionEvent` values after successful
+state transitions.
+
+Subscribers may include:
+- React UI
+- recognition/session coordination
+- other components that need session-state updates
+
+Subscribers must not directly mutate session state through the event.
+Session state changes must go through the session controller.
 
 ## Current Sprint 1 flow
 
