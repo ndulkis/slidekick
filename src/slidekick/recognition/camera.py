@@ -8,6 +8,7 @@ import cv2  # OpenCV for webcam capture and frame processing
 import mediapipe as mp  # Google's MediaPipe for gesture recognition and hand landmark detection
 
 from .events import create_landmark_event
+from .sample_recorder import SampleRecorder
 from .swipe_recognizer import detect_swipe
 
 # Gesture Recognizer Task Model Path
@@ -226,10 +227,7 @@ def process_hand_detection(
     return gesture_event, landmark_event, last_swipe_time, missed_hand_frames
 
 
-def should_close_window(window_name):
-    # waitKey also allows OpenCV to process window events.
-    key = cv2.waitKey(1) & 0xFF
-
+def should_close_window(window_name, key):
     # Press Q to close the camera.
     if key == ord("q"):
         return True
@@ -271,8 +269,22 @@ def run_camera(event_handler=None):
         maxlen=45
     )  # Keep track at most 45 frames of history
 
+    # TOP(TEST) Used for S2 testing sample recorder
+    sample_recorder = SampleRecorder("data/evaluation/s2_recognition_samples.jsonl")
+
+    evaluation_labels = [
+        "swipe_right",
+        "swipe_left",
+        "no_gesture",
+    ]
+
+    evaluation_index = sample_recorder.next_label_index
+    pending_expected_gesture = None
+
+    # BOTTOM(TEST)
+
     # Stores the time when the most recent swipe was detected
-    last_swipe_time = 0
+    last_swipe_time = 0.0
 
     # Stores how many frames skeleton has been missing for
     missed_hand_frames = 0
@@ -312,6 +324,37 @@ def run_camera(event_handler=None):
                 )
             )
 
+            # TOP TEST
+            if (
+                pending_expected_gesture is not None
+                and sample_recorder.active_sample is None
+                and landmark_event is not None
+            ):
+                sample_recorder.start_sample(
+                    pending_expected_gesture,
+                    landmark_event["timestamp"],
+                )
+
+                print(f"Hand detected. Recording: {pending_expected_gesture}")
+
+                pending_expected_gesture = None
+
+            if sample_recorder.active_sample is not None:
+                if landmark_event is not None:
+                    sample_recorder.record_landmarks(landmark_event)
+
+                if gesture_event is not None:
+                    sample_recorder.record_prediction(gesture_event)
+
+                current_time = time.monotonic()
+
+                if sample_recorder.should_finish_sample(current_time):
+                    sample_recorder.finish_sample(current_time)
+                    evaluation_index = sample_recorder.next_label_index
+            # BOTTOM TEST
+
+            # (TEST) Used for S2 Testing
+
             if gesture_event is not None:
                 last_gesture_name = gesture_event["gesture"]
                 last_gesture_confidence = gesture_event["confidence"]
@@ -327,7 +370,27 @@ def run_camera(event_handler=None):
 
             cv2.imshow(window_name, frame)
 
-            if should_close_window(window_name):
+            # TOP TEST
+            # S2 evaluation controls
+            key = cv2.waitKey(1) & 0xFF
+
+            if (
+                key == ord(" ")
+                and sample_recorder.active_sample is None
+                and pending_expected_gesture is None
+            ):
+                pending_expected_gesture = evaluation_labels[evaluation_index]
+
+                position_history.clear()
+                last_swipe_time = 0.0
+
+                print(
+                    f"Sample {evaluation_index + 1}/{len(evaluation_labels)} armed: "
+                    f"{pending_expected_gesture}. Waiting for hand..."
+                )
+            # BOTTOM TEST
+
+            if should_close_window(window_name, key):
                 break
 
     camera.release()
