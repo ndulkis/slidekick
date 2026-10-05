@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Any
+
+import pyautogui
 
 
 class PresentationAdapter(ABC):
@@ -6,55 +9,90 @@ class PresentationAdapter(ABC):
 
     @abstractmethod
     def next_slide(self) -> bool:
-        pass
+        """Advance to the next slide."""
+        raise NotImplementedError
 
     @abstractmethod
     def previous_slide(self) -> bool:
-        pass
+        """Return to the previous slide."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def pause_presentation(self) -> bool:
+        """Pause the presentation by blanking the screen."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def resume_presentation(self) -> bool:
+        """Resume the presentation by removing the blank screen."""
+        raise NotImplementedError
 
     @abstractmethod
     def end_presentation(self) -> bool:
-        pass
+        """Exit presentation mode."""
+        raise NotImplementedError
 
 
 class KeyboardPresentationAdapter(PresentationAdapter):
-    """MVP Adapter that uses universal keystrokes to control slides.
-
-    pyautogui is imported lazily inside each method rather than at module
-    load time, since it requires a real display and would break importing
-    this module inside the headless dev container. Calls made without a
-    display (e.g. inside the container) return False instead of raising.
-    """
+    """MVP adapter that uses universal keystrokes to control slides."""
 
     def next_slide(self) -> bool:
-        try:
-            import pyautogui
-        except KeyError:
-            print("No display available: cannot simulate keystroke.")
-            return False
-
         print("Simulating: RIGHT arrow (Next Slide)")
         pyautogui.press("right")
         return True
 
     def previous_slide(self) -> bool:
-        try:
-            import pyautogui
-        except KeyError:
-            print("No display available: cannot simulate keystroke.")
-            return False
-
         print("Simulating: LEFT arrow (Previous Slide)")
         pyautogui.press("left")
         return True
 
-    def end_presentation(self) -> bool:
-        try:
-            import pyautogui
-        except KeyError:
-            print("No display available: cannot simulate keystroke.")
-            return False
+    def pause_presentation(self) -> bool:
+        print("Simulating: B key (Pause / Black Screen)")
+        pyautogui.press("b")
+        return True
 
+    def resume_presentation(self) -> bool:
+        print("Simulating: B key (Resume / Restore Screen)")
+        pyautogui.press("b")
+        return True
+
+    def end_presentation(self) -> bool:
         print("Simulating: ESCAPE (End Presentation)")
         pyautogui.press("esc")
         return True
+
+    def execute_command(self, command: str) -> dict[str, Any]:
+        """Validate and execute a SlideKick presentation command."""
+
+        commands = {
+            "next": self.next_slide,
+            "previous": self.previous_slide,
+            "pause": self.pause_presentation,
+            "resume": self.resume_presentation,
+        }
+
+        normalized_command = command.strip().lower() if isinstance(command, str) else ""
+
+        action = commands.get(normalized_command)
+
+        if action is None:
+            return {
+                "status": "error",
+                "error": "Invalid Command",
+                "command": command,
+            }
+
+        try:
+            action()
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "status": "error",
+                "error": "Native Execution Error",
+                "command": normalized_command,
+                "message": str(exc),
+            }
+
+        return {
+            "status": "success",
+            "command": normalized_command,
+        }
