@@ -1,7 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-import pyautogui
+
+def _press_key(key: str) -> None:
+    """Load PyAutoGUI only when a real keyboard command is executed."""
+    import pyautogui
+
+    pyautogui.press(key)
 
 
 class PresentationAdapter(ABC):
@@ -38,27 +43,27 @@ class KeyboardPresentationAdapter(PresentationAdapter):
 
     def next_slide(self) -> bool:
         print("Simulating: RIGHT arrow (Next Slide)")
-        pyautogui.press("right")
+        _press_key("right")
         return True
 
     def previous_slide(self) -> bool:
         print("Simulating: LEFT arrow (Previous Slide)")
-        pyautogui.press("left")
+        _press_key("left")
         return True
 
     def pause_presentation(self) -> bool:
         print("Simulating: B key (Pause / Black Screen)")
-        pyautogui.press("b")
+        _press_key("b")
         return True
 
     def resume_presentation(self) -> bool:
         print("Simulating: B key (Resume / Restore Screen)")
-        pyautogui.press("b")
+        _press_key("b")
         return True
 
     def end_presentation(self) -> bool:
         print("Simulating: ESCAPE (End Presentation)")
-        pyautogui.press("esc")
+        _press_key("esc")
         return True
 
     def execute_command(self, command: str) -> dict[str, Any]:
