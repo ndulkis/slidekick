@@ -180,7 +180,8 @@ def check_node_modules() -> Result:
         )
     if shutil.which("npm") is None:
         return Result(FAIL, name, "npm not found", "Install Node (e.g. `nvm install`).")
-    result = run(["npm", "ls", "--depth=0"], cwd=FRONTEND)
+    npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
+    result = run([npm, "ls", "--depth=0"], cwd=FRONTEND)
     if result.returncode != 0:
         problems = [
             line.strip()
