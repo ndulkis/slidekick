@@ -72,7 +72,7 @@ class SessionController:
         self, event_type: SessionEventType, new_state: SessionState, use_case: str
     ) -> SessionEvent:
         previous_state = self.state
-        self.state = new_state
+        self._state = new_state
         event = SessionEvent(
             type=event_type,
             previous_state=previous_state,
