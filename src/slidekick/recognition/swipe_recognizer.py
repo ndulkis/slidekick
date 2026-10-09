@@ -1,6 +1,22 @@
 from collections import deque
+from dataclasses import dataclass
+from enum import Enum, auto
 
 from .events import create_gesture_event
+
+
+# This class handles states GESTURE_READY and GESTURE_ONGOING as a way to avoid duplicate gestures from triggering at the same time
+class GestureState(Enum):
+    GESTURE_READY = auto()
+    GESTURE_ONGOING = auto()
+
+
+@dataclass
+class GestureRecognitionState:
+    state: GestureState = GestureState.GESTURE_READY
+    last_gesture_time: float = 0.0
+    stationary_start_time: float | None = None
+
 
 MIN_DISPLACEMENT = 0.10
 IDEAL_DISPLACEMENT = 0.20
@@ -15,6 +31,12 @@ IDEAL_MAX_DURATION = 1.00
 MAX_SWIPE_DURATION = 1.75
 
 SWIPE_COOLDOWN = 1.5
+
+# Minimum time the hand must remain settled before recognizing another gesture
+GESTURE_STATIONARY_DURATION = 0.30
+
+# Maximum normalized hand movement allowed while considering the hand stationary
+GESTURE_STATIONARY_THRESHOLD = 0.015
 
 CONFIDENCE_THRESHOLD = 0.55
 
@@ -97,11 +119,34 @@ def calculate_swipe_confidence(
     return clamp(confidence)
 
 
+# Checks whether the hand moved less than our experimental threshold between consecutive frames
+def is_hand_stationary(
+    position_history: deque[tuple[float, float, float]],
+) -> bool:
+    if len(position_history) < 2:
+        return False
+
+    # Compare the hand's current position to its previous position
+    previous_x = position_history[-2][1]
+    previous_y = position_history[-2][2]
+
+    current_x = position_history[-1][1]
+    current_y = position_history[-1][2]
+
+    movement_x = abs(current_x - previous_x)
+    movement_y = abs(current_y - previous_y)
+
+    return (
+        movement_x <= GESTURE_STATIONARY_THRESHOLD
+        and movement_y <= GESTURE_STATIONARY_THRESHOLD
+    )
+
+
 def detect_swipe(
     hand_landmarks,
     position_history: deque[tuple[float, float, float]],
-    last_swipe_time,
-    current_time,
+    gesture_state: GestureRecognitionState,
+    current_time: float,
 ):
     # Uses landmark 9 near the center of the hand to track movement
     tracked_landmark = hand_landmarks[9]
@@ -115,8 +160,34 @@ def detect_swipe(
         )
     )
 
+    # While a gesture is ongoing, the function won't evaluate another swipe.
+    # It will wait for the hand to settle and for the cooldown to finish
+    if gesture_state.state == GestureState.GESTURE_ONGOING:
+        if is_hand_stationary(position_history):
+            if gesture_state.stationary_start_time is None:
+                gesture_state.stationary_start_time = current_time
+        else:
+            gesture_state.stationary_start_time = None
+
+        cooldown_complete = (
+            current_time - gesture_state.last_gesture_time >= SWIPE_COOLDOWN
+        )
+
+        stationary_complete = (
+            gesture_state.stationary_start_time is not None
+            and current_time - gesture_state.stationary_start_time
+            >= GESTURE_STATIONARY_DURATION
+        )
+
+        if cooldown_complete and stationary_complete:
+            gesture_state.state = GestureState.GESTURE_READY
+            gesture_state.stationary_start_time = None
+            position_history.clear()
+
+        return None
+
     if len(position_history) <= 1:
-        return None, last_swipe_time
+        return None
 
     # Gets the oldest and newest recorded hand positions
     starting_time, starting_x, starting_y = position_history[0]
@@ -148,7 +219,7 @@ def detect_swipe(
         frame_movements.append(current_x - previous_x)
 
     if not frame_movements:
-        return None, last_swipe_time
+        return None
 
     right_movements = sum(movement > 0 for movement in frame_movements)
     left_movements = sum(movement < 0 for movement in frame_movements)
@@ -169,11 +240,11 @@ def detect_swipe(
         direction_consistency = left_consistency
 
     else:
-        return None, last_swipe_time
+        return None
 
     valid_duration = MIN_SWIPE_DURATION <= movement_duration <= MAX_SWIPE_DURATION
 
-    cooldown_complete = ending_time - last_swipe_time >= SWIPE_COOLDOWN
+    cooldown_complete = ending_time - gesture_state.last_gesture_time >= SWIPE_COOLDOWN
 
     # Movement must be primarily horizontal, but diagonal movement is allowed
     valid_candidate = (
@@ -185,7 +256,7 @@ def detect_swipe(
     )
 
     if not valid_candidate:
-        return None, last_swipe_time
+        return None
 
     confidence = calculate_swipe_confidence(
         primary_displacement,
@@ -196,7 +267,7 @@ def detect_swipe(
 
     # Candidate must also meet the final confidence threshold
     if confidence < CONFIDENCE_THRESHOLD:
-        return None, last_swipe_time
+        return None
 
     gesture_event = create_gesture_event(
         gesture_name,
@@ -204,9 +275,10 @@ def detect_swipe(
         ending_time,
     )
 
-    last_swipe_time = ending_time
+    gesture_state.state = GestureState.GESTURE_ONGOING
+    gesture_state.last_gesture_time = ending_time
+    gesture_state.stationary_start_time = None
 
-    # Start measuring fresh movement after an accepted swipe
     position_history.clear()
 
-    return gesture_event, last_swipe_time
+    return gesture_event
