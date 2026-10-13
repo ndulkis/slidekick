@@ -27,3 +27,5 @@ ruff
 pip-tools
 
 pyautogui
+
+flask

@@ -1,26 +1,42 @@
-import pyautogui
-from flask import Flask
+"""Native Windows helper API for controlling presentations."""
+
+from flask import Flask, Response, jsonify
+
+from slidekick.presentation_adapter import KeyboardPresentationAdapter
 
 app = Flask(__name__)
-
-
-class KeyboardPresentationAdapter:
-    """MVP Adapter that uses universal keystrokes to control slides."""
-
-    def next_slide(self) -> bool:
-        print("Simulating: RIGHT arrow (Next Slide)")
-        pyautogui.press("right")
-        return True
-
-
 adapter = KeyboardPresentationAdapter()
 
 
-@app.route("/next", methods=["GET"])
-def trigger_next():
-    print("Command received: next slide")
-    adapter.next_slide()
-    return "Success", 200
+def _build_response(command: str) -> tuple[Response, int]:
+    """Execute a command and format the Flask JSON response."""
+    result = adapter.execute_command(command)
+    status_code = 200 if result.get("status") == "success" else 500
+    return jsonify(result), status_code
+
+
+@app.route("/next", methods=["GET", "POST"])
+def trigger_next() -> tuple[Response, int]:
+    """Trigger the next slide command."""
+    return _build_response("next")
+
+
+@app.route("/previous", methods=["GET", "POST"])
+def trigger_previous() -> tuple[Response, int]:
+    """Trigger the previous slide command."""
+    return _build_response("previous")
+
+
+@app.route("/pause", methods=["GET", "POST"])
+def trigger_pause() -> tuple[Response, int]:
+    """Trigger the pause presentation command."""
+    return _build_response("pause")
+
+
+@app.route("/resume", methods=["GET", "POST"])
+def trigger_resume() -> tuple[Response, int]:
+    """Trigger the resume presentation command."""
+    return _build_response("resume")
 
 
 if __name__ == "__main__":
