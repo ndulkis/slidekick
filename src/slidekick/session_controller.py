@@ -3,10 +3,9 @@ and UC8 (Finalize). See docs/session-state-model.md for the full state
 diagram this implements, including the valid and invalid transition
 tables.
 
-This is separate from the gesture-to-command controller (PR #10):
-that one maps a recognized gesture to a presentation command, this one
-owns whether a session is running at all. The two are independent
-observers of each other's events, not one built on the other.
+This is separate from GestureCommandController in gesture_command_controller.py.
+That one maps recognized gestures to presentation commands, this one owns whether
+a session is running at all. They are not connected yet.
 """
 
 from .contracts import SessionEvent, SessionEventType, SessionState
@@ -72,7 +71,7 @@ class SessionController:
         self, event_type: SessionEventType, new_state: SessionState, use_case: str
     ) -> SessionEvent:
         previous_state = self.state
-        self.state = new_state
+        self._state = new_state
         event = SessionEvent(
             type=event_type,
             previous_state=previous_state,

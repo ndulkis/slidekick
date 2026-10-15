@@ -18,9 +18,12 @@ Installs Python 3.11 and the packages pinned in `requirements.lock`, sets `PYTHO
 Same Python setup, then runs `pytest tests/smoke`. Kept intentionally narrow: confirms a gesture result has the right shape and maps to the right command, not model accuracy. Runners have no webcam or display, so this relies on prerecorded samples and a mocked `pyautogui`.
 
 **frontend**
-Installs Node 20, runs `npm ci` against `frontend/package-lock.json`, then `npm run lint`, `npm run test`, and `npm run build`. The build step runs `tsc -b` first, so it doubles as the type check.
+Installs Node 20, runs `npm ci` against `frontend/package-lock.json`, then `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`. After a successful build it uploads `frontend/dist` as an artifact named `frontend-dist`, kept for 14 days.
 
-All three run in parallel and all three must pass. There's also a commented-out `integration` job at the bottom, inactive since `tests/integration` doesn't exist yet. It's left in as a draft for whoever picks up integration testing, not something currently running.
+**security**
+Scans the full commit history for secrets with Gitleaks, audits `requirements.lock` with pip-audit, runs Bandit over `src/`, and runs `npm audit` on the frontend. The npm audit step reports findings but does not fail the job.
+
+All four jobs run in parallel. The bottom of the file has a short comment marking where slower, production-only checks can be added later.
 
 ## What changed
 
@@ -28,6 +31,6 @@ This file started from a version a teammate had written, which included a fourth
 
 - **`container-build` removed.** That job built and verified the same Docker image the local dev environment used. Since the project no longer runs on that container setup, there was nothing left for the job to build or verify against.
 - **`model-evaluation` removed.** It called `scripts/evaluate_model.py` against a dataset at `tests/data/ci_validation`. Neither the script nor the dataset exist in the repo. It was commented out already, so it never ran, but leaving in a reference to files that don't exist risked someone assuming that check was real or already working.
-- **`integration` kept, commented out.** Same situation, `tests/integration` doesn't exist yet, but this one reflects real planned work, integration tests are called out as a future requirement, so it's left as a labeled placeholder rather than deleted.
+- **Integration tests now run in CI.** The commented-out `integration` job was removed once `tests/integration` existed. Those tests, along with `tests/recognition`, run as a step in the `quality` job.
 - **References to the old local dev tooling removed from comments.** Comments now describe what each step does on its own, without assuming a container-based dev setup as context.
 - **Job names unchanged.** `quality`, `gesture-smoke-test`, and `frontend` keep their original names so any branch protection rule already requiring them by name continues to work without reconfiguration.

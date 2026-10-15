@@ -27,6 +27,7 @@ ruff format --check .
 python scripts/check_env.py --ci
 python -m pytest -q tests/environment
 python -m pytest -q tests/unit
+python -m pytest -q tests/integration tests/recognition
 python -m pytest -q tests/smoke
 ```
 
@@ -45,6 +46,7 @@ Validate and build:
 
 ```bash
 npm run lint
+npm run typecheck
 npm run test
 npm run build
 ```
