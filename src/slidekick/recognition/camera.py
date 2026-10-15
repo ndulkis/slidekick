@@ -9,7 +9,7 @@ import mediapipe as mp  # Google's MediaPipe for gesture recognition and hand la
 
 from .events import create_landmark_event
 from .sample_recorder import SampleRecorder
-from .swipe_recognizer import detect_swipe
+from .swipe_recognizer import GestureRecognitionState, detect_swipe
 
 # Gesture Recognizer Task Model Path
 MODEL_PATH = "models/gesture_recognizer.task"
@@ -204,7 +204,11 @@ def draw_recognition_diagnostic(
 
 
 def process_hand_detection(
-    result, frame, position_history, last_swipe_time, missed_hand_frames
+    result,
+    frame,
+    position_history,
+    gesture_state: GestureRecognitionState,
+    missed_hand_frames,
 ):
     # Stores standardized recognition events generated during the current frame
     gesture_event = None
@@ -225,8 +229,8 @@ def process_hand_detection(
         landmark_event = create_landmark_event(hand_landmarks, current_time)
 
         # Detects a swipe and returns the standardized gesture event along with the updated last swipe time
-        gesture_event, last_swipe_time = detect_swipe(
-            hand_landmarks, position_history, last_swipe_time, current_time
+        gesture_event = detect_swipe(
+            hand_landmarks, position_history, gesture_state, current_time
         )
 
         landmark_points = get_landmark_points(hand_landmarks, frame)
@@ -241,7 +245,7 @@ def process_hand_detection(
         if missed_hand_frames >= HAND_LOSS_GRACE_FRAMES:
             position_history.clear()
 
-    return gesture_event, landmark_event, last_swipe_time, missed_hand_frames
+    return gesture_event, landmark_event, missed_hand_frames
 
 
 def should_close_window(window_name, key):
@@ -300,8 +304,8 @@ def run_camera(event_handler=None):
 
     # BOTTOM(TEST)
 
-    # Stores the time when the most recent swipe was detected
-    last_swipe_time = 0.0
+    # Stores gesture lifecycle information across camera frames
+    gesture_state = GestureRecognitionState()
 
     # Stores how many frames skeleton has been missing for
     missed_hand_frames = 0
@@ -348,10 +352,8 @@ def run_camera(event_handler=None):
             # Processes the MediaPipe image and returns detection results
             result = recognizer.recognize_for_video(mp_image, frame_timestamp_ms)
 
-            gesture_event, landmark_event, last_swipe_time, missed_hand_frames = (
-                process_hand_detection(
-                    result, frame, position_history, last_swipe_time, missed_hand_frames
-                )
+            gesture_event, landmark_event, missed_hand_frames = process_hand_detection(
+                result, frame, position_history, gesture_state, missed_hand_frames
             )
 
             # TOP TEST
@@ -412,7 +414,8 @@ def run_camera(event_handler=None):
                 pending_expected_gesture = evaluation_labels[evaluation_index]
 
                 position_history.clear()
-                last_swipe_time = 0.0
+                gesture_state = GestureRecognitionState()
+                missed_hand_frames = 0
 
                 print(
                     f"Sample {evaluation_index + 1}/{len(evaluation_labels)} armed: "

@@ -1,6 +1,6 @@
 import json
-import time
 import math
+import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,15 +18,17 @@ from slidekick.recognition.camera import (
     should_close_window,
 )
 from slidekick.recognition.sample_recorder import SampleRecorder
+from slidekick.recognition.swipe_recognizer import GestureRecognitionState
 
 OUTPUT_PATH = Path("data/evaluation/s2_recognition_samples.jsonl")
 
-PROTOCOL_VERSION = "s3-r03-t2-tracking-030-v1"
+PROTOCOL_VERSION = "s3-r03-t2-lifecycle-030-v1"
 
 # Ten attempts per condition gives us 100 total trials.
 TRIALS_PER_CASE = 3
 
 PREP_TIME_SECONDS = 3.0
+
 
 @dataclass(frozen=True)
 class EvaluationCase:
@@ -85,13 +87,21 @@ EVALUATION_CASES = [
     ),
     EvaluationCase(
         name="slow_swipe_right",
-        expected_gesture="swipe_right",
-        instruction="Perform one deliberately SLOW swipe to the RIGHT.",
+        expected_gesture="no_gesture",
+        instruction=(
+            "Move your hand deliberately and continuously SLOWLY "
+            "to the RIGHT. No gesture should be detected."
+        ),
+        expected_prediction_count=0,
     ),
     EvaluationCase(
         name="slow_swipe_left",
-        expected_gesture="swipe_left",
-        instruction="Perform one deliberately SLOW swipe to the LEFT.",
+        expected_gesture="no_gesture",
+        instruction=(
+            "Move your hand deliberately and continuously SLOWLY "
+            "to the LEFT. No gesture should be detected."
+        ),
+        expected_prediction_count=0,
     ),
     EvaluationCase(
         name="casual_reposition",
@@ -288,10 +298,10 @@ def run_evaluation():
 
     position_history: deque[tuple[float, float, float]] = deque(maxlen=45)
 
-    last_swipe_time = 0.0
+    gesture_state = GestureRecognitionState()
     missed_hand_frames = 0
     failed_reads = 0
-    
+
     # Tracking measurements for the active evaluation trial
     total_processed_frames = 0
     hand_detected_frames = 0
@@ -312,9 +322,7 @@ def run_evaluation():
 
         while True:
             if pending_start_time is not None:
-                remaining = math.ceil(
-                    pending_start_time - time.monotonic()
-                )
+                remaining = math.ceil(pending_start_time - time.monotonic())
 
                 if remaining > 0 and remaining != last_countdown_value:
                     print(f"{remaining} ", end="", flush=True)
@@ -324,7 +332,7 @@ def run_evaluation():
                     print()
                     print("GO! Waiting for hand detection...")
                     last_countdown_value = 0
-        
+
             success, frame = camera.read()
 
             if not success:
@@ -356,13 +364,12 @@ def run_evaluation():
             (
                 gesture_event,
                 landmark_event,
-                last_swipe_time,
                 missed_hand_frames,
             ) = process_hand_detection(
                 result,
                 frame,
                 position_history,
-                last_swipe_time,
+                gesture_state,
                 missed_hand_frames,
             )
 
@@ -377,7 +384,7 @@ def run_evaluation():
                     pending_case.expected_gesture,
                     landmark_event["timestamp"],
                 )
-                
+
                 # Reset tracking measurements for the new trial
                 total_processed_frames = 0
                 hand_detected_frames = 0
@@ -484,14 +491,11 @@ def run_evaluation():
                 last_countdown_value = None
 
                 position_history.clear()
-                last_swipe_time = 0.0
+                gesture_state = GestureRecognitionState()
                 missed_hand_frames = 0
 
                 print("=" * 72)
-                print(
-                    f"Trial {sequence_index + 1}/"
-                    f"{len(evaluation_sequence)}"
-                )
+                print(f"Trial {sequence_index + 1}/{len(evaluation_sequence)}")
                 print(f"Evaluation round: {round_number}")
                 print(f"Scenario: {evaluation_case.name}")
                 print(f"Expected gesture: {evaluation_case.expected_gesture}")
