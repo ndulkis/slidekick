@@ -1,6 +1,6 @@
 import json
-import time
 import math
+import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +27,7 @@ PROTOCOL_VERSION = "s3-r03-t1-v3"
 TRIALS_PER_CASE = 3
 
 PREP_TIME_SECONDS = 3.0
+
 
 @dataclass(frozen=True)
 class EvaluationCase:
@@ -305,9 +306,7 @@ def run_evaluation():
 
         while True:
             if pending_start_time is not None:
-                remaining = math.ceil(
-                    pending_start_time - time.monotonic()
-                )
+                remaining = math.ceil(pending_start_time - time.monotonic())
 
                 if remaining > 0 and remaining != last_countdown_value:
                     print(f"{remaining} ", end="", flush=True)
@@ -317,7 +316,7 @@ def run_evaluation():
                     print()
                     print("GO! Waiting for hand detection...")
                     last_countdown_value = 0
-        
+
             success, frame = camera.read()
 
             if not success:
@@ -439,10 +438,7 @@ def run_evaluation():
                 missed_hand_frames = 0
 
                 print("=" * 72)
-                print(
-                    f"Trial {sequence_index + 1}/"
-                    f"{len(evaluation_sequence)}"
-                )
+                print(f"Trial {sequence_index + 1}/{len(evaluation_sequence)}")
                 print(f"Evaluation round: {round_number}")
                 print(f"Scenario: {evaluation_case.name}")
                 print(f"Expected gesture: {evaluation_case.expected_gesture}")

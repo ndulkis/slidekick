@@ -112,6 +112,47 @@ class GestureCalibration:
     stationary_duration: float = GESTURE_STATIONARY_DURATION
     stationary_threshold: float = GESTURE_STATIONARY_THRESHOLD
 
+    def __post_init__(self):
+        """Validate calibration settings before they are used."""
+
+        # Displacement thresholds must be ordered correctly.
+        if not 0 <= self.min_displacement < self.ideal_displacement:
+            raise ValueError(
+                "Minimum displacement must be non-negative "
+                "and less than ideal displacement."
+            )
+
+        # Direction consistency and axis purity are normalized scores.
+        if not 0 <= self.min_direction_consistency <= 1:
+            raise ValueError("Direction consistency must be between 0 and 1.")
+
+        if not 0 <= self.min_axis_purity <= 1:
+            raise ValueError("Axis purity must be between 0 and 1.")
+
+        # Duration thresholds must progress from minimum to maximum.
+        if not (
+            0
+            <= self.min_swipe_duration
+            < self.ideal_min_duration
+            <= self.ideal_max_duration
+            < self.max_swipe_duration
+        ):
+            raise ValueError("Swipe duration thresholds must be ordered correctly.")
+
+        # Confidence is a normalized score.
+        if not 0 <= self.confidence_threshold <= 1:
+            raise ValueError("Confidence threshold must be between 0 and 1.")
+
+        # Re-arming requirements cannot be negative.
+        if self.swipe_cooldown < 0:
+            raise ValueError("Swipe cooldown cannot be negative.")
+
+        if self.stationary_duration < 0:
+            raise ValueError("Stationary duration cannot be negative.")
+
+        if not 0 <= self.stationary_threshold <= 1:
+            raise ValueError("Stationary threshold must be between 0 and 1.")
+
 
 # ============================================================
 # 3. CONFIDENCE SCORING HELPERS

@@ -14,6 +14,7 @@ from slidekick.recognition.swipe_recognizer import (
     MIN_DISPLACEMENT,
     MIN_SWIPE_DURATION,
     SWIPE_COOLDOWN,
+    GestureCalibration,
     GestureRecognitionState,
     GestureState,
     calculate_axis_purity,
@@ -72,6 +73,228 @@ def run_movement(
             detected_events.append(gesture_event)
 
     return detected_events, gesture_state
+
+
+def test_calibration_resets_to_defaults():
+    # Create a customized configuration.
+    calibration = GestureCalibration(
+        min_displacement=0.30,
+        ideal_displacement=0.40,
+        confidence_threshold=0.80,
+    )
+
+    # Confirm the custom settings were applied.
+    assert calibration.min_displacement == 0.30
+    assert calibration.ideal_displacement == 0.40
+    assert calibration.confidence_threshold == 0.80
+
+    # Simulate the user selecting "Reset to Defaults".
+    calibration = GestureCalibration()
+
+    # Verify that all settings match the default configuration.
+    assert calibration == GestureCalibration()
+    assert calibration.min_displacement == 0.10
+    assert calibration.ideal_displacement == 0.20
+    assert calibration.confidence_threshold == 0.55
+
+
+def test_calibration_rejects_invalid_displacement():
+    # Minimum displacement cannot exceed ideal displacement.
+    with pytest.raises(ValueError):
+        GestureCalibration(
+            min_displacement=0.40,
+            ideal_displacement=0.20,
+        )
+
+    # Equal values would cause division by zero.
+    with pytest.raises(ValueError):
+        GestureCalibration(
+            min_displacement=0.20,
+            ideal_displacement=0.20,
+        )
+
+    # Negative displacement values are invalid.
+    with pytest.raises(ValueError):
+        GestureCalibration(
+            min_displacement=-0.10,
+        )
+
+
+def test_custom_calibration_rearms_with_shorter_cooldown():
+    # Configure a shorter cooldown and stationary period.
+    calibration = GestureCalibration(
+        swipe_cooldown=0.50,
+        stationary_duration=0.20,
+    )
+
+    position_history = deque(maxlen=45)
+    gesture_state = GestureRecognitionState()
+
+    # First, perform a valid swipe.
+    x_positions = [0.30, 0.35, 0.40, 0.45, 0.50]
+
+    detected_events = []
+
+    for index, x in enumerate(x_positions):
+        event = detect_swipe(
+            hand_landmarks=create_fake_hand(x, 0.50),
+            position_history=position_history,
+            gesture_state=gesture_state,
+            current_time=100.0 + index * 0.10,
+            calibration=calibration,
+        )
+
+        if event is not None:
+            detected_events.append(event)
+
+    # The recognizer should now block additional gestures.
+    assert len(detected_events) == 1
+    assert gesture_state.state == GestureState.GESTURE_ONGOING
+
+    # Hold the hand stationary after the swipe.
+    for current_time in [100.50, 100.60, 100.70]:
+        detect_swipe(
+            hand_landmarks=create_fake_hand(0.50, 0.50),
+            position_history=position_history,
+            gesture_state=gesture_state,
+            current_time=current_time,
+            calibration=calibration,
+        )
+
+        if current_time < 100.70:
+            # Both re-arming requirements are not yet satisfied.
+            assert gesture_state.state == GestureState.GESTURE_ONGOING
+
+    # Both custom requirements are satisfied at 100.70.
+    assert gesture_state.state == GestureState.GESTURE_READY
+
+
+def test_default_calibration_accepts_moderate_confidence_swipe():
+    # Use the default recognition thresholds.
+    calibration = GestureCalibration()
+
+    position_history = deque(maxlen=45)
+    gesture_state = GestureRecognitionState()
+
+    detected_events = []
+
+    # Total displacement is 0.15, producing a confidence
+    # score of approximately 0.80.
+    x_positions = [0.30, 0.34, 0.38, 0.42, 0.45]
+
+    for index, x in enumerate(x_positions):
+        event = detect_swipe(
+            hand_landmarks=create_fake_hand(x, 0.50),
+            position_history=position_history,
+            gesture_state=gesture_state,
+            current_time=100.0 + index * 0.10,
+            calibration=calibration,
+        )
+
+        if event is not None:
+            detected_events.append(event)
+
+    # Default threshold is 0.55, so this swipe is accepted.
+    assert len(detected_events) == 1
+    assert detected_events[0]["gesture"] == "swipe_right"
+    assert gesture_state.state == GestureState.GESTURE_ONGOING
+
+
+def test_custom_calibration_rejects_low_confidence_swipe():
+    # Set the confidence requirement higher than the default.
+    calibration = GestureCalibration(
+        confidence_threshold=1.0,
+    )
+
+    position_history = deque(maxlen=45)
+    gesture_state = GestureRecognitionState()
+
+    detected_events = []
+
+    # Total displacement is 0.15, below the ideal of 0.20.
+    # The movement still exceeds the default minimum of 0.10.
+    x_positions = [0.30, 0.34, 0.38, 0.42, 0.45]
+
+    for index, x in enumerate(x_positions):
+        event = detect_swipe(
+            hand_landmarks=create_fake_hand(x, 0.50),
+            position_history=position_history,
+            gesture_state=gesture_state,
+            current_time=100.0 + index * 0.10,
+            calibration=calibration,
+        )
+
+        if event is not None:
+            detected_events.append(event)
+
+    # The custom confidence threshold should reject the swipe.
+    assert detected_events == []
+    assert gesture_state.state == GestureState.GESTURE_READY
+
+
+def test_custom_calibration_accepts_long_swipe():
+    # Require a longer swipe than the default configuration.
+    calibration = GestureCalibration(
+        min_displacement=0.30,
+        ideal_displacement=0.40,
+    )
+
+    position_history = deque(maxlen=45)
+    gesture_state = GestureRecognitionState()
+
+    detected_events = []
+
+    # Total horizontal displacement is 0.40.
+    x_positions = [0.20, 0.30, 0.40, 0.50, 0.60]
+
+    for index, x in enumerate(x_positions):
+        event = detect_swipe(
+            hand_landmarks=create_fake_hand(x, 0.50),
+            position_history=position_history,
+            gesture_state=gesture_state,
+            current_time=100.0 + index * 0.10,
+            calibration=calibration,
+        )
+
+        if event is not None:
+            detected_events.append(event)
+
+    # The movement satisfies the customized swipe requirements.
+    assert len(detected_events) == 1
+    assert detected_events[0]["gesture"] == "swipe_right"
+    assert gesture_state.state == GestureState.GESTURE_ONGOING
+
+
+def test_custom_calibration_rejects_short_swipe():
+    # Custom settings require a longer swipe than the default.
+    calibration = GestureCalibration(
+        min_displacement=0.30,
+        ideal_displacement=0.40,
+    )
+
+    position_history = deque(maxlen=45)
+    gesture_state = GestureRecognitionState()
+
+    detected_events = []
+
+    # Total horizontal displacement is 0.20.
+    x_positions = [0.30, 0.35, 0.40, 0.45, 0.50]
+
+    for index, x in enumerate(x_positions):
+        event = detect_swipe(
+            hand_landmarks=create_fake_hand(x, 0.50),
+            position_history=position_history,
+            gesture_state=gesture_state,
+            current_time=100.0 + index * 0.10,
+            calibration=calibration,
+        )
+
+        if event is not None:
+            detected_events.append(event)
+
+    # This movement does not meet the custom minimum distance.
+    assert detected_events == []
+    assert gesture_state.state == GestureState.GESTURE_READY
 
 
 def test_detect_swipe_recognizes_right_swipe():
