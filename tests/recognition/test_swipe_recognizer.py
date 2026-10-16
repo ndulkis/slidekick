@@ -543,3 +543,56 @@ def test_hand_tracking_loss_does_not_rearm_gesture():
 
     assert more_events == []
     assert gesture_state.state == GestureState.GESTURE_ONGOING
+
+
+def test_tracking_loss_clears_incomplete_swipe_history():
+    """A partial swipe must not continue across prolonged tracking loss."""
+
+    position_history = deque(maxlen=45)
+    gesture_state = GestureRecognitionState()
+
+    # Begin a swipe, but do not move far enough to trigger recognition.
+    first_events, gesture_state = run_movement(
+        [0.30, 0.33, 0.36],
+        start_time=100.0,
+        gesture_state=gesture_state,
+        position_history=position_history,
+    )
+
+    assert first_events == []
+    assert len(position_history) > 0
+    assert gesture_state.state == GestureState.GESTURE_READY
+
+    class FakeResult:
+        def __init__(self):
+            self.hand_landmarks = []
+
+    missed_hand_frames = 0
+
+    for _ in range(HAND_LOSS_GRACE_FRAMES):
+        gesture_event, landmark_event, missed_hand_frames = process_hand_detection(
+            FakeResult(),
+            None,
+            position_history,
+            gesture_state,
+            missed_hand_frames,
+        )
+
+        assert gesture_event is None
+        assert landmark_event is None
+
+    # Prolonged tracking loss must discard the incomplete trajectory.
+    assert len(position_history) == 0
+    assert gesture_state.state == GestureState.GESTURE_READY
+
+    # The hand returns at a different position, but doesn't swipe.
+    # If old positions were retained, this could look like a swipe.
+    resumed_events, gesture_state = run_movement(
+        [0.55, 0.55, 0.55, 0.55, 0.55],
+        start_time=101.0,
+        gesture_state=gesture_state,
+        position_history=position_history,
+    )
+
+    assert resumed_events == []
+    assert gesture_state.state == GestureState.GESTURE_READY
