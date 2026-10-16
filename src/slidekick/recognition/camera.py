@@ -269,7 +269,7 @@ def print_recognition_event(event):
     #   print(event)
 
 
-def run_camera(event_handler=None):
+def run_camera(event_handler=None, key_handler=None):
     window_name = create_camera_window()
 
     # 0 tells OpenCV to use the computer's default webcam.
@@ -422,6 +422,9 @@ def run_camera(event_handler=None):
 
             if should_close_window(window_name, key):
                 break
+
+            if key_handler is not None:
+                key_handler(key)
 
     camera.release()
     cv2.destroyAllWindows()
