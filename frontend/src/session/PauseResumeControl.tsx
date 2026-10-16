@@ -7,7 +7,8 @@ interface PauseResumeControlProps {
 }
 
 function PauseResumeControl({ status, onPause, onResume }: PauseResumeControlProps) {
-  const disabled = status === 'loading' || status === 'error' || status === 'ready'
+  const disabled =
+    status === 'loading' || status === 'error' || status === 'ready' || status === 'ended'
 
   if (status === 'paused') {
     return (

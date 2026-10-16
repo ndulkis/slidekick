@@ -47,6 +47,13 @@ describe('CameraPreview', () => {
     expect(status).toHaveClass('camera-preview', 'camera-preview-paused')
   })
 
+  it('shows camera off when the session has ended', () => {
+    render(<CameraPreview status="ended" hasCamera={true} />)
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent('Camera off')
+    expect(status).toHaveClass('camera-preview', 'camera-preview-ended')
+  })
+
   it('prioritizes hasCamera=false over an error status', () => {
     render(<CameraPreview status="error" hasCamera={false} />)
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSession } from '../core/useSession'
 import CameraPreview from '../session/CameraPreview'
 import GestureFeedback from '../session/GestureFeedback'
 import GestureFeedbackToast from '../session/GestureFeedbackToast'
@@ -6,7 +7,9 @@ import PauseResumeControl from '../session/PauseResumeControl'
 import PresentationStatus from '../session/PresentationStatus'
 import SessionMessage from '../session/SessionMessage'
 import SessionStatusBadge from '../session/SessionStatusBadge'
-import type { PresentationConnectionStatus, RecognitionEvent, SessionStatus } from '../session/types'
+import StartEndControl from '../session/StartEndControl'
+import type { PresentationConnectionStatus, RecognitionEvent } from '../session/types'
+import { toSessionStatus } from '../session/types'
 import './SessionPage.css'
 
 const demoGestures: RecognitionEvent[] = [
@@ -17,18 +20,26 @@ const demoGestures: RecognitionEvent[] = [
 ]
 
 function SessionPage() {
-  const [status, setStatus] = useState<SessionStatus>('ready')
+  const session = useSession()
+  // Loading and error come from the camera/recognition side, which isn't
+  // connected yet, so they're simulated with the demo controls below.
+  const [override, setOverride] = useState<'loading' | 'error' | undefined>(undefined)
   const [presentationStatus, setPresentationStatus] =
     useState<PresentationConnectionStatus>('connected')
   const [hasCamera, setHasCamera] = useState(true)
   const [event, setEvent] = useState<RecognitionEvent | undefined>(undefined)
 
-  function handlePause() {
-    setStatus('paused')
-  }
+  const status = toSessionStatus(session.state, override)
+  // Gestures only control the presentation while the session is active.
+  const visibleEvent = status === 'active' ? event : undefined
 
-  function handleResume() {
-    setStatus('active')
+  // Clear the last gesture on every session change so an old gesture doesn't
+  // reappear as if it were new (e.g. after Pause -> Resume).
+  function withClearedGesture(action: () => void) {
+    return () => {
+      setEvent(undefined)
+      action()
+    }
   }
 
   return (
@@ -44,27 +55,42 @@ function SessionPage() {
 
       <CameraPreview status={status} hasCamera={hasCamera} />
 
-      <GestureFeedback status={status} event={event} />
+      <GestureFeedback status={status} event={visibleEvent} />
 
-      <GestureFeedbackToast event={event} />
+      <GestureFeedbackToast event={visibleEvent} />
 
-      <PauseResumeControl status={status} onPause={handlePause} onResume={handleResume} />
+      <div className="session-controls">
+        <StartEndControl
+          status={status}
+          onStart={withClearedGesture(session.start)}
+          onEnd={withClearedGesture(session.end)}
+        />
+        <PauseResumeControl
+          status={status}
+          onPause={withClearedGesture(session.pause)}
+          onResume={withClearedGesture(session.resume)}
+        />
+      </div>
 
       <div className="session-demo-controls">
         <h2>Demo controls</h2>
         <p>
           SlideKick isn't connected to a real camera or gesture recognition
-          backend yet. These buttons simulate state changes for testing and
+          backend yet. These buttons simulate outside inputs for testing and
           the usability walkthrough.
         </p>
 
         <fieldset>
-          <legend>Session status</legend>
-          {(['loading', 'ready', 'active', 'paused', 'error'] as SessionStatus[]).map((s) => (
-            <button key={s} type="button" onClick={() => setStatus(s)}>
-              {s}
-            </button>
-          ))}
+          <legend>Camera and recognition</legend>
+          <button type="button" onClick={() => setOverride('loading')}>
+            simulate loading
+          </button>
+          <button type="button" onClick={() => setOverride('error')}>
+            simulate error
+          </button>
+          <button type="button" onClick={() => setOverride(undefined)}>
+            clear
+          </button>
         </fieldset>
 
         <fieldset>

@@ -30,6 +30,15 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
     )
   }
 
+  // The session state model turns the camera off once a session has ended.
+  if (status === 'ended') {
+    return (
+      <div className="camera-preview camera-preview-ended" role="status">
+        Camera off
+      </div>
+    )
+  }
+
   const label = status === 'paused' ? 'Camera preview (paused)' : 'Camera preview'
 
   return (

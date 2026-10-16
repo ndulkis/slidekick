@@ -38,6 +38,13 @@ describe('PauseResumeControl', () => {
     expect(button).toBeDisabled()
   })
 
+  it('renders disabled Pause button when ended', () => {
+    render(<PauseResumeControl status="ended" onPause={vi.fn()} onResume={vi.fn()} />)
+    const button = screen.getByRole('button', { name: 'Pause session' })
+    expect(button).toHaveTextContent('Pause')
+    expect(button).toBeDisabled()
+  })
+
   it('calls onPause when clicked while active', () => {
     const onPause = vi.fn()
     const onResume = vi.fn()
