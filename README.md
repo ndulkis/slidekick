@@ -52,6 +52,7 @@ Run from the repo root with `.venv` active. On Windows, set `$env:PYTHONPATH = "
 | `PYTHONPATH=src python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
 | `PYTHONPATH=src python scripts/check_env.py` | Check the dev environment and print fixes |
 | `./scripts/verify.sh` | Run the environment check plus the main CI checks |
+| `./scripts/checks/<name>.sh` | Run one CI check on its own, e.g. `./scripts/checks/unit-tests.sh` (see `scripts/checks/` for the list) |
 | `python -m pytest` | Run all Python tests |
 | `ruff check .` / `ruff format .` | Lint / format Python |
 | `npm --prefix frontend run dev` | Dashboard dev server on port 5173 |
