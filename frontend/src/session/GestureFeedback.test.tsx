@@ -39,11 +39,27 @@ describe('GestureFeedback', () => {
 
   it('skips the confidence indicator entirely when gesture is none', () => {
     render(
-      <GestureFeedback status="paused" event={{ gesture: 'none', confidence: 0.92 }} />,
+      <GestureFeedback status="active" event={{ gesture: 'none', confidence: 0.92 }} />,
     )
 
     expect(screen.getByText('No gesture detected')).toBeInTheDocument()
     expect(screen.queryByText('92% confidence')).not.toBeInTheDocument()
     expect(screen.queryByText('Confidence unavailable')).not.toBeInTheDocument()
+  })
+
+  it('shows a paused message instead of the gesture when paused', () => {
+    render(<GestureFeedback status="paused" event={{ gesture: 'next', confidence: 0.92 }} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('Gesture recognition paused')
+    expect(screen.queryByText('Next')).not.toBeInTheDocument()
+    expect(screen.queryByText('92% confidence')).not.toBeInTheDocument()
+  })
+
+  it('shows recognition off instead of the gesture when ended', () => {
+    render(<GestureFeedback status="ended" event={{ gesture: 'next', confidence: 0.92 }} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('Gesture recognition off')
+    expect(screen.queryByText('Next')).not.toBeInTheDocument()
+    expect(screen.queryByText('92% confidence')).not.toBeInTheDocument()
   })
 })
