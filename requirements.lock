@@ -51,6 +51,8 @@ mediapipe==0.10.35
     # via -r requirements.in
 mouseinfo==0.1.3
     # via pyautogui
+mss==10.2.0
+    # via -r requirements.in
 numpy==2.4.6
     # via
     #   -r requirements.in

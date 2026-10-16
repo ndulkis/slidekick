@@ -76,6 +76,12 @@ jobs:
       - name: Run integration and recognition tests
         run: python -m pytest -q tests/integration tests/recognition
 
+      # Command safety tests gate the merge. Latency is report-only (no time
+      # limit until runner variability is known); see the job summary. The
+      # end-to-end test skips itself (needs a display).
+      - name: Run performance and command safety tests
+        run: python -m pytest -q -s tests/performance
+
   gesture-smoke-test:
     name: Gesture Smoke Tests
     runs-on: ubuntu-latest
