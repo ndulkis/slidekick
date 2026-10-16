@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from slidekick.gesture_command_controller import GestureCommandController
+from slidekick.presentation_adapter import PresentationAdapter
 from slidekick.recognition import camera
 from slidekick.recognition.swipe_recognizer import SWIPE_COOLDOWN
 
@@ -44,10 +45,41 @@ class FakeClock:
 
 
 def fake_result(x):
+    if x is None:
+        return SimpleNamespace(hand_landmarks=[])
     landmarks = [FakeLandmark(0.0, 0.0) for _ in range(21)]
     # The swipe recognizer tracks landmark 9.
     landmarks[9] = FakeLandmark(x, 0.50)
     return SimpleNamespace(hand_landmarks=[landmarks])
+
+
+class RecordingAdapter(PresentationAdapter):
+    """Records each command and when it arrived."""
+
+    def __init__(self):
+        self.calls = []
+
+    def commands(self):
+        return [command for command, _ in self.calls]
+
+    def _record(self, command: str) -> bool:
+        self.calls.append((command, time.perf_counter_ns()))
+        return True
+
+    def next_slide(self) -> bool:
+        return self._record("next")
+
+    def previous_slide(self) -> bool:
+        return self._record("previous")
+
+    def pause_presentation(self) -> bool:
+        return self._record("pause")
+
+    def resume_presentation(self) -> bool:
+        return self._record("resume")
+
+    def end_presentation(self) -> bool:
+        return self._record("end")
 
 
 class Pipeline:
@@ -61,30 +93,32 @@ class Pipeline:
         self.last_swipe_time = 0.0
         self.missed_hand_frames = 0
 
+    def feed(self, x, fps=FPS):
+        """Process one frame with the hand at x (None: no hand). Returns any gesture event."""
+        self.clock.now += 1 / fps
+        (
+            gesture_event,
+            landmark_event,
+            self.last_swipe_time,
+            self.missed_hand_frames,
+        ) = camera.process_hand_detection(
+            fake_result(x),
+            self.frame,
+            self.position_history,
+            self.last_swipe_time,
+            self.missed_hand_frames,
+        )
+        camera.emit_event(gesture_event, self.controller.handle_event)
+        camera.emit_event(landmark_event, self.controller.handle_event)
+        return gesture_event
+
     def run_swipe(self, x_positions) -> int:
         """Returns perf_counter_ns() at the start of the frame that recognized the swipe."""
         self.clock.now += SWIPE_COOLDOWN + 0.5
 
         for x in x_positions:
-            self.clock.now += 1 / FPS
             start = time.perf_counter_ns()
-
-            (
-                gesture_event,
-                landmark_event,
-                self.last_swipe_time,
-                self.missed_hand_frames,
-            ) = camera.process_hand_detection(
-                fake_result(x),
-                self.frame,
-                self.position_history,
-                self.last_swipe_time,
-                self.missed_hand_frames,
-            )
-            camera.emit_event(gesture_event, self.controller.handle_event)
-            camera.emit_event(landmark_event, self.controller.handle_event)
-
-            if gesture_event is not None:
+            if self.feed(x) is not None:
                 return start
 
         raise AssertionError("swipe was never recognized")

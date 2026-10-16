@@ -99,7 +99,7 @@ python -m pytest tests/performance -s -k recognition_to_command
 
 **End-to-end: recognition → key press → visible slide change** (local only, macOS or Windows):
 
-1. Open `tests/performance/e2e_test_deck.pptx` in PowerPoint, Keynote or Google Slides.
+1. Make a slide deck in PowerPoint, Keynote or Google Slides: slide 1 solid black, slide 2 solid white, no transitions.
 2. Run the command below. During the 5-second countdown, start the slideshow on slide 1, fullscreen on your main monitor.
 3. Don't touch the mouse or keyboard until the slides stop flipping.
 
