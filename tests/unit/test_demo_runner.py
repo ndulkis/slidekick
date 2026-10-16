@@ -8,7 +8,8 @@ from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.session_coordinator import SessionCoordinator
 
 spec = importlib.util.spec_from_file_location(
-    "gesture_demo_runner", Path(__file__).resolve().parents[2] / "scripts/run_gesture_control.py"
+    "gesture_demo_runner",
+    Path(__file__).resolve().parents[2] / "scripts/run_gesture_control.py",
 )
 assert spec and spec.loader
 runner = importlib.util.module_from_spec(spec)
@@ -44,7 +45,10 @@ def test_camera_key_controls_lifecycle_not_slideshow():
     session.start()
     control(ord("p"))
     assert session.state is SessionState.PAUSED
-    assert session.handle_event({"event_type": "gesture", "gesture": "swipe_right"}) is False
+    assert (
+        session.handle_event({"event_type": "gesture", "gesture": "swipe_right"})
+        is False
+    )
     control(ord("e"))  # paused -> ended is not allowed yet
     assert session.state is SessionState.PAUSED
     control(ord("r"))

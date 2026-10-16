@@ -38,7 +38,9 @@ class RecordingAdapter:
 
 def create_coordinator():
     adapter = RecordingAdapter()
-    return SessionCoordinator(gestures=GestureCommandController(adapter=adapter)), adapter
+    return SessionCoordinator(
+        gestures=GestureCommandController(adapter=adapter)
+    ), adapter
 
 
 def swipe(name="swipe_right"):

@@ -54,7 +54,10 @@ class SessionCoordinator:
         if event.get("event_type") != "gesture":
             return False
         gesture = event.get("gesture")
-        if not isinstance(gesture, str) or gesture not in self.gestures.gesture_bindings:
+        if (
+            not isinstance(gesture, str)
+            or gesture not in self.gestures.gesture_bindings
+        ):
             return False
         try:
             result = self.gestures.handle_event(dict(event))
