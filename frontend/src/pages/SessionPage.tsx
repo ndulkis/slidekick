@@ -30,6 +30,17 @@ function SessionPage() {
   const [event, setEvent] = useState<RecognitionEvent | undefined>(undefined)
 
   const status = toSessionStatus(session.state, override)
+  // Gestures only control the presentation while the session is active.
+  const visibleEvent = status === 'active' ? event : undefined
+
+  // Clear the last gesture on every session change so an old gesture doesn't
+  // reappear as if it were new (e.g. after Pause -> Resume).
+  function withClearedGesture(action: () => void) {
+    return () => {
+      setEvent(undefined)
+      action()
+    }
+  }
 
   return (
     <section>
@@ -44,13 +55,21 @@ function SessionPage() {
 
       <CameraPreview status={status} hasCamera={hasCamera} />
 
-      <GestureFeedback status={status} event={event} />
+      <GestureFeedback status={status} event={visibleEvent} />
 
-      <GestureFeedbackToast event={event} />
+      <GestureFeedbackToast event={visibleEvent} />
 
       <div className="session-controls">
-        <StartEndControl status={status} onStart={session.start} onEnd={session.end} />
-        <PauseResumeControl status={status} onPause={session.pause} onResume={session.resume} />
+        <StartEndControl
+          status={status}
+          onStart={withClearedGesture(session.start)}
+          onEnd={withClearedGesture(session.end)}
+        />
+        <PauseResumeControl
+          status={status}
+          onPause={withClearedGesture(session.pause)}
+          onResume={withClearedGesture(session.resume)}
+        />
       </div>
 
       <div className="session-demo-controls">

@@ -103,6 +103,31 @@ describe('SessionPage', () => {
     expect(screen.getByText('Camera off')).toBeInTheDocument()
   })
 
+  it('does not show gestures while paused', () => {
+    render(<SessionPage />)
+    startSession()
+    fireEvent.click(button('Pause session'))
+
+    fireEvent.click(button('next'))
+
+    expect(screen.getByText('Gesture recognition paused')).toBeInTheDocument()
+    expect(screen.queryByText('Next')).not.toBeInTheDocument()
+    expect(screen.queryByText('92% confidence')).not.toBeInTheDocument()
+  })
+
+  it('clears the last gesture after pausing and resuming', () => {
+    render(<SessionPage />)
+    startSession()
+    fireEvent.click(button('next'))
+    expect(screen.getByText('92% confidence')).toBeInTheDocument()
+
+    fireEvent.click(button('Pause session'))
+    fireEvent.click(button('Resume session'))
+
+    expect(screen.getByText('No gesture detected')).toBeInTheDocument()
+    expect(screen.queryByText('92% confidence')).not.toBeInTheDocument()
+  })
+
   it('blocks actions that are not valid in the current state', () => {
     render(<SessionPage />)
 
