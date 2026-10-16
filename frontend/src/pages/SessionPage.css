@@ -58,6 +58,12 @@
   font-weight: 500;
 }
 
+.session-controls {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+
 button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

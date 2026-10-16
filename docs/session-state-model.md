@@ -44,7 +44,7 @@ class SessionEvent:
     use_case: str  # "UC10", "UC6", "UC7", or "UC8"
 ```
 
-The controller's public operations are named after the triggering action (`start()`, `pause()`, `resume()`, `end()`), matching the plan's `START_SESSION` / `PAUSE_SESSION` / `RESUME_SESSION` / `END_SESSION` vocabulary. Each operation, once it validates the current state and changes it, publishes the `SessionEvent` above describing what just happened. This follows the same shape as `RecognitionEvent` and `CommandEvent` in the [Observer Event Contract](observer-event-contract.md), where that contract now also lives.
+The controller's public operations are named after the triggering action (`start()`, `pause()`, `resume()`, `end()`), matching the plan's `START_SESSION` / `PAUSE_SESSION` / `RESUME_SESSION` / `END_SESSION` vocabulary. Each operation, once it validates the current state and changes it, publishes the `SessionEvent` above describing what just happened. “The event is also documented in the Observer Event Contract.”
 
 ## Valid transitions
 
@@ -79,4 +79,4 @@ The diagram has no edge from Gesture Recognition Paused directly to Presentation
 1. Treat it as invalid, require `RESUME_SESSION` before `END_SESSION`, matching what's actually drawn.
 2. Treat it as valid, a user should be able to end a presentation while paused without being forced to resume first.
 
-This needs a team decision before T2 implements `end()`, since the controller's validation logic depends on which way this goes. Until decided, this model treats `PAUSED -> END_SESSION` as invalid, the conservative reading of what's actually drawn.
+`SessionController.end` currently follows the first option, so ending is valid only from `RUNNING`. If the team picks the second option, the guard in `end`, the transition tables above, and any client copy of the transition rules, such as the frontend `useSession` hook, all need to change together.

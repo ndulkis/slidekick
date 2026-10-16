@@ -23,7 +23,7 @@ The current browser demonstration uses a deterministic placeholder recognition f
 
 | Boundary | Owns | Must not own |
 |---|---|---|
-| React UI | User-visible controls, accessibility states, rendering session state | `pyautogui`, model inference, adapter implementation, owning session state |
+| React UI | User-visible controls, accessibility states, rendering session state | `pyautogui`, model inference, adapter implementation, the authoritative session state |
 | Recognition | Producing `RecognitionEvent` values | Presentation side effects or command execution |
 | Controller | Gesture-to-command mapping, adapter invocation, session state ownership and transitions | Camera capture or UI rendering |
 | Presentation adapter | Translating normalized commands into app-specific actions | Gesture interpretation or UI state |
@@ -35,7 +35,9 @@ Recognition events contain `gesture`, `confidence` in `[0, 1]`, and `source`. Co
 
 The detailed contract is documented in [Observer Event Contract](observer-event-contract.md).
 
-**Sprint 2 addition:** session state (idle, running, paused, ended) is owned by a new session controller, which validates transitions and publishes a `SessionEvent` on each change. See [Session State Model](session-state-model.md) for the full state machine and its mapping to UC10, UC6, UC7, and UC8. This is separate from the gesture-to-command controller in PR #10; the two are independent observers of each other's events, not one built on the other.
+**Sprint 2 update:** recognition events are now plain dictionaries with an `event_type`, and `GestureCommandController` maps them to presentation commands. The typed `RecognitionEvent` and `CommandEvent` described above, and `Gesture.NONE`, are not in the current code. See [Observer Event Contract](observer-event-contract.md) for the current shapes.
+
+Session state (idle, running, paused, ended) is owned by `SessionController`, which validates transitions and publishes a `SessionEvent` on each change. See [Session State Model](session-state-model.md) for the full state machine and its mapping to UC10, UC6, UC7, and UC8. `SessionController` is separate from `GestureCommandController`, and the two are not connected yet. Until a browser to Python transport exists, the frontend `useSession` hook keeps a client-side copy of session state that follows the same transition rules.
 
 ## MVP scope
 

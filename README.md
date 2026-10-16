@@ -1,233 +1,157 @@
 # SlideKick
 
-Control presentations with hand gestures. SlideKick watches a webcam, recognizes gestures, and turns them into slide controls (next, previous, end) for whatever presentation app is in focus.
-
-> **Status: early development.** The dev environment, CI, configuration, a keyboard-based presentation adapter, the dashboard shell, and a camera/gesture-recognition prototype are in place. The camera pipeline isn't connected to the slide controls yet.
-
-## Tech stack
+Control presentations with hand gestures. SlideKick watches a webcam, recognizes swipes, and sends slide commands (next, previous) to whatever presentation app is in focus.
 
 | Area | Tools |
 | --- | --- |
 | Backend / ML | Python 3.11, MediaPipe, OpenCV, NumPy |
 | Slide control | `pyautogui` keystrokes |
-| Dashboard | React 19, TypeScript, Vite, React Router |
-| Quality | Ruff, pytest, oxlint, Vitest + Testing Library |
-| Environment | Python virtual environment (`.venv`), Node 20, GitHub Actions |
+| Dashboard | React 19, TypeScript, Vite |
+| Quality | Ruff, pytest, oxlint, Vitest, GitHub Actions |
 
 Runs on macOS and Windows. CI runs on Linux.
 
-## Repository layout
+## Setup
 
-```
-.
-├── src/slidekick/        Python package: config, presentation adapters, recognition/ (camera + gestures)
-├── tests/                Python tests: unit/, smoke/, environment/
-├── frontend/             Dashboard app: Dashboard, Session, and Settings pages
-├── docs/                 Design, build, and testing notes
-├── data/, models/        Local datasets and the gesture model (gesture_recognizer.task)
-├── scripts/              Dev scripts: check_env.py (environment doctor), verify.sh (run everything CI runs)
-├── .env.example          Every configuration setting, documented
-├── .python-version       Python version the project targets
-├── .nvmrc                Node version the project targets
-├── manual_test.py        Check that the keyboard adapter changes slides on your machine
-├── requirements.in       Direct Python dependencies (edit this)
-└── requirements.lock     Pinned versions generated from requirements.in (don't edit)
-```
-
-## Getting started
-
-**Prerequisites:** Python 3.11, Node 20, and Git. Docker and Lando are no longer used.
-
-| | macOS | Windows |
-| --- | --- | --- |
-| Python 3.11 | `brew install python@3.11` or [pyenv](https://github.com/pyenv/pyenv) | [python.org installer](https://www.python.org/downloads/) (includes the `py` launcher) |
-| Node 20 | `nvm install` (reads `.nvmrc`) or `brew install node@20` | [nodejs.org installer](https://nodejs.org/) or [nvm-windows](https://github.com/coreybutler/nvm-windows) |
-| Git | Xcode Command Line Tools | [Git for Windows](https://git-scm.com/download/win) (includes Git Bash) |
+**Prerequisites:** Python 3.11, Node 20, Git.
 
 **macOS**
 
 ```bash
-git clone git@github.com:ndulkis/slidekick.git
-cd slidekick
-
+git clone git@github.com:ndulkis/slidekick.git && cd slidekick
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.lock
 npm --prefix frontend ci
-
 ./scripts/verify.sh
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-git clone git@github.com:ndulkis/slidekick.git
-cd slidekick
-
+git clone git@github.com:ndulkis/slidekick.git; cd slidekick
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.lock
 npm --prefix frontend ci
-
-$env:PYTHONPATH = "src"
-python scripts/check_env.py
+$env:PYTHONPATH = "src"; python scripts/check_env.py
 ```
 
-If PowerShell won't run `Activate.ps1`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or use Command Prompt with `.venv\Scripts\activate.bat`. `verify.sh` is a bash script, so on Windows run it from **Git Bash** after `source .venv/Scripts/activate`.
+- Activate `.venv` in every new terminal.
+- If PowerShell blocks `Activate.ps1`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+- On Windows, run `verify.sh` from Git Bash.
+- After pulling, if the environment check fails, rerun `pip install -r requirements.lock` or `npm --prefix frontend ci`.
 
-Your prompt shows `(.venv)` while the environment is active. Activate it again in every new terminal. `pytest.ini` and `verify.sh` put `src/` on `PYTHONPATH`, so `import slidekick` works without an install step.
+## Commands
 
-### Verify your setup
+Run from the repo root with `.venv` active. On Windows, set `$env:PYTHONPATH = "src"` instead of the `PYTHONPATH=src` prefix.
 
-| Command | When to use it |
+| Command | What it does |
 | --- | --- |
-| `python scripts/check_env.py` | Fast environment check (a few seconds). Prints a fix for anything wrong. Needs `PYTHONPATH=src`. |
-| `./scripts/verify.sh` | Runs the check above, then every check CI runs. If this passes, CI should too. |
+| `PYTHONPATH=src python scripts/run_gesture_control.py` | Run SlideKick: webcam gestures control the focused presentation |
+| `PYTHONPATH=src python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
+| `PYTHONPATH=src python scripts/check_env.py` | Check the dev environment and print fixes |
+| `./scripts/verify.sh` | Run the environment check plus the main CI checks |
+| `./scripts/checks/<name>.sh` | Run one CI check on its own, e.g. `./scripts/checks/unit-tests.sh` (see `scripts/checks/` for the list) |
+| `python -m pytest` | Run all Python tests |
+| `ruff check .` / `ruff format .` | Lint / format Python |
+| `npm --prefix frontend run dev` | Dashboard dev server on port 5173 |
+| `npm --prefix frontend run test` / `run lint` | Frontend tests / lint |
+| `python manual_test.py` | Press "next slide" once after 3 seconds, to check slide control |
 
-`check_env.py` checks that:
-
-- the Python version matches `.python-version` and the Node version matches `.nvmrc`
-- `import slidekick` resolves to `src/slidekick`
-- installed Python packages match `requirements.lock`
-- `frontend/node_modules` matches `package-lock.json`
-- NumPy, OpenCV, Ruff, pytest, and pip-compile all work
-- `.env.example` exists, your configuration is valid for your OS, and the gesture model exists
-- `data/` and `models/` are writable
-
-The most common fixes are `pip install -r requirements.lock` (after someone changes the lock file) and `npm --prefix frontend ci` (frontend dependencies are missing or stale). Run the check again after pulling changes that touch either.
-
-A successful `verify.sh` ends with `All checks passed. Your environment matches CI.`
+**Permissions:**
+- **macOS:** System Settings → Privacy & Security. Give your terminal **Camera**, **Accessibility** (key presses) and **Screen Recording** (end-to-end latency test only).
+- **Windows:** Settings → Privacy & security → Camera, including **Let desktop apps access your camera**.
 
 ## Configuration
 
-Settings are read in this order, highest priority first:
-
-1. Real environment variables (how CI supplies them)
-2. A `.env` file at the repo root (local overrides; git ignores it)
-3. Defaults in `src/slidekick/config.py`
-
-Every setting is optional, so most people don't need a `.env`. To override one, copy `.env.example` to `.env` (`cp` on macOS, `copy` on Windows) and uncomment what you need.
+Every setting is optional. To override one, copy `.env.example` to `.env`. Real environment variables take priority over `.env`, which takes priority over the defaults in `src/slidekick/config.py`.
 
 | Variable | Default | Allowed values |
 | --- | --- | --- |
 | `SLIDEKICK_ENV` | `development` | `development`, `test`, `production` |
 | `SLIDEKICK_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `SLIDEKICK_MODEL_PATH` | `models/gesture_recognizer.task` | Any path, relative to the repo root |
-| `SLIDEKICK_CAMERA_INDEX` | `0` | `0` for the default webcam, `1`, `2`, ... for others |
-| `SLIDEKICK_CAMERA_BACKEND` | Depends on your OS | See below |
+| `SLIDEKICK_MODEL_PATH` | `models/gesture_recognizer.task` | Path relative to the repo root |
+| `SLIDEKICK_CAMERA_INDEX` | `0` | `0`, `1`, `2`, ... |
+| `SLIDEKICK_CAMERA_BACKEND` | `avfoundation` (macOS), `msmf` (Windows), `v4l2` (Linux) | That OS's default, `any`, or `dshow` on Windows |
 
-SlideKick detects your OS at startup and defaults to its camera backend:
+Never commit real secrets. Add the name to `.env.example` with an empty value, and put CI secrets under GitHub **Settings → Secrets and variables → Actions**.
 
-| OS | Default backend | Also allowed |
+## Tests
+
+| Folder | What it covers | In CI |
 | --- | --- | --- |
-| macOS | `avfoundation` | `any` |
-| Windows | `msmf` | `dshow` (try it if the camera is slow to open or shows a black frame), `any` |
-| Linux (CI) | `v4l2` | `any` |
+| `tests/unit/` | Individual modules | Yes |
+| `tests/integration/` | Recognition event → controller → adapter | Yes |
+| `tests/recognition/` | Swipe recognizer | Yes |
+| `tests/smoke/` | Slide-control path | Yes |
+| `tests/environment/` | Python/Node versions stay in sync across config files | Yes |
+| `tests/performance/` | Latency benchmarks and command safety (see below) | Yes, except end-to-end |
 
-`check_env.py` reports invalid values, such as a backend from another OS. The camera prototype doesn't read these settings yet.
+`tests/conftest.py` fakes `pyautogui`, since CI has no display.
 
-**Secrets:** none are needed yet. When one is, add its name to `.env.example` with an empty value (never a real one), put the real value in your `.env`, and for CI add it under GitHub **Settings → Secrets and variables → Actions** and pass it to the job with `${{ secrets.NAME }}`.
+### Latency tests
 
-## Common commands
+**Recognition → command** (mock adapter, runs anywhere):
 
-| Command | What it does |
+```bash
+python -m pytest tests/performance -s -k recognition_to_command
+```
+
+**End-to-end: recognition → key press → visible slide change** (local only, macOS or Windows):
+
+1. Make a slide deck in PowerPoint, Keynote or Google Slides: slide 1 solid black, slide 2 solid white, no transitions.
+2. Run the command below. During the 5-second countdown, start the slideshow on slide 1, fullscreen on your main monitor.
+3. Don't touch the mouse or keyboard until the slides stop flipping.
+
+```bash
+SLIDEKICK_E2E=1 SLIDEKICK_PERF_NOTE="Keynote, MacBook Air M2" python -m pytest tests/performance -s -k end_to_end
+```
+
+The recognition → command test only prints its results. Every end-to-end run is saved to `perf-results/`:
+
+| File | Contents |
 | --- | --- |
-Run these from the repo root with `.venv` active. The last column is the Lando command each one replaces.
+| `summary.csv` | One row per run: median, p95, min, max, commit, OS, Python, and your `SLIDEKICK_PERF_NOTE` |
+| `<timestamp>_<test>.csv` | Raw per-sample times for that run |
 
-| Command | What it does | Was |
-| --- | --- | --- |
-| `python scripts/check_env.py` | Check the dev environment and suggest fixes | `lando doctor` |
-| `./scripts/verify.sh` | Run the environment check plus all CI checks, with a summary | `lando verify` |
-| `python` | Python REPL | `lando python` |
-| `python -m pytest` | Run the Python tests | `lando test` |
-| `ruff check .` | Lint Python with Ruff | `lando lint` |
-| `ruff format .` | Format Python with Ruff | `lando format` |
-| `PYTHONPATH=src python -m slidekick.recognition.camera` | Run the camera and gesture-recognition prototype (macOS; see [Running the camera prototype](#running-the-camera-prototype) for Windows) | |
-| `npm --prefix frontend run dev` | Start the Vite dev server on port 5173 | `lando frontend-dev` |
-| `npm --prefix frontend run test` | Run the frontend tests | `lando frontend-test` |
-| `npm --prefix frontend run lint` | Lint the frontend with oxlint | `lando frontend-lint` |
-| `npm --prefix frontend <args>` | Run any npm command inside `frontend/` | `lando npm <args>` |
-| `pip-compile --no-index --output-file=requirements.lock --strip-extras requirements.in` | Regenerate `requirements.lock` | `lando lock` |
-| `pip install -r requirements.lock` | Reinstall dependencies (e.g. after the lock changes) | `lando rebuild -y` |
-
-## Python dependencies
-
-`requirements.in` lists the direct dependencies. `requirements.lock` pins every version and is what your `.venv` and CI install.
-
-To add or change a dependency:
-
-1. Edit `requirements.in`.
-2. Run `pip-compile --no-index --output-file=requirements.lock --strip-extras requirements.in`.
-3. Run `pip install -r requirements.lock`.
-4. Commit both files.
-
-MediaPipe is pinned below 1.0 (`mediapipe<1`) because 1.0.x crashes on startup on Apple Silicon Macs. 0.10.x works on macOS and Windows.
-
-## Running the camera prototype
-
-**macOS**
-
-```bash
-PYTHONPATH=src python -m slidekick.recognition.camera
-```
-
-**Windows (PowerShell)**
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m slidekick.recognition.camera
-```
-
-Run it from the repo root with `.venv` active. It has to run as a module (`-m`), not by file path, because `camera.py` imports the other files in `recognition/` as part of the package. A window shows the camera feed with the detected hand skeleton. Press `q` or close the window to stop.
-
-- **macOS:** allow camera access for your terminal in System Settings → Privacy & Security → Camera.
-- **Windows:** allow camera access in Settings → Privacy & security → Camera, including **Let desktop apps access your camera**.
-
-## Testing slide control on your machine
-
-```bash
-pip install pyautogui
-python manual_test.py
-```
-
-You have 3 seconds to click into an open presentation. It should move forward one slide. On macOS, give your terminal Accessibility permission first (System Settings → Privacy & Security → Accessibility). Windows needs no extra permission.
+Use `SLIDEKICK_PERF_NOTE` to record test conditions (app, machine, lighting). Neither test includes webcam capture or MediaPipe inference, so they don't measure the 200 ms target on their own.
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes to every branch and on pull requests into `develop` or `production`. It installs Python and Node directly on an Ubuntu runner (no Docker) and runs four jobs in parallel:
+`.github/workflows/ci.yml` runs on every push and on PRs into `develop` or `production`:
 
-| Job | What it runs |
+| Job | Runs |
 | --- | --- |
-| Lint and Unit Tests | `check_env.py --ci`, `ruff check`, `ruff format --check`, `tests/environment`, `tests/unit` |
+| Lint and Unit Tests | Environment check, Ruff lint + format, environment/unit/integration/recognition/performance tests (latency shown in the job summary) |
 | Gesture Smoke Tests | `tests/smoke` |
-| Frontend | oxlint, an explicit TypeScript type check, Vitest, a production build, and uploads the build as the `frontend-dist` artifact |
-| Security Checks | Gitleaks (committed secrets), pip-audit (Python dependency vulnerabilities), Bandit (Python source in `src/`), and `npm audit` (report only, doesn't fail the job) |
+| Frontend | oxlint, type check, Vitest, production build |
+| Security Checks | Gitleaks, pip-audit, Bandit, `npm audit` (report only) |
 
-Integration tests are stubbed out at the bottom of the workflow. When enabled, they run only on pushes to `production`.
+## Python dependencies
 
-Run `./scripts/verify.sh` before pushing to catch the same failures locally.
+Edit `requirements.in`, never `requirements.lock`. To add a package:
 
-### Python test suites
+1. Add it to `requirements.in`.
+2. Run `pip-compile --no-emit-index-url --output-file=requirements.lock --strip-extras requirements.in`.
+3. Check the lock diff. Running pip-compile on a Mac adds macOS-only packages (`pyobjc-*`) and drops Windows ones (`colorama`). Remove or restore those by hand, or CI and Windows installs break.
+4. Run `pip install -r requirements.lock`, then commit both files.
 
-| Folder | Purpose |
-| --- | --- |
-| `tests/unit/` | Fast tests for individual modules, including configuration |
-| `tests/smoke/` | End-to-end checks of the slide-control path. Later: model loads, a sample input is processed, commands map correctly. No retraining. |
-| `tests/environment/` | Fails if the versions in `.python-version`, `.nvmrc`, `ci.yml`, and `requirements.lock` drift apart |
-
-`tests/conftest.py` provides a fake `pyautogui`, since CI has no display. `python -m pytest` runs all three suites.
+MediaPipe stays below 1.0 because 1.0.x crashes on Apple Silicon.
 
 ## Branching
 
-- `production`: stable, default branch
-- `develop`: integration branch
-- Feature branches: branch from `develop`, then open a PR back into `develop`
-
-When `develop` is ready to release, merge it into `production` with a PR.
+Branch from `develop` and open PRs back into `develop`. Release by merging `develop` into `production` through a PR.
 
 ## Docs
 
-- [Build](docs/build.md): from a clean checkout to a validated build
-- [Lando rollout changes](docs/lando-rollout-changes.md): how CI changed when Lando and Docker were removed
-- [UI states](docs/ui-states.md): dashboard states to support, plus accessibility personas
-- [Keyboard navigation testing](docs/keyboard-nav-testing.md): manual accessibility test results for the dashboard shell
+| Doc | Topic |
+| --- | --- |
+| [build.md](docs/build.md) | From a clean checkout to a validated build |
+| [architecture-decision-note.md](docs/architecture-decision-note.md) | Architecture decisions |
+| [observer-event-contract.md](docs/observer-event-contract.md) | Recognition event format |
+| [session-state-model.md](docs/session-state-model.md) | Session states |
+| [S2-R04-T1-Command-Mapping-Spec.md](docs/S2-R04-T1-Command-Mapping-Spec.md) | Gesture-to-command mapping |
+| [ui-states.md](docs/ui-states.md), [accessibility-personas.md](docs/accessibility-personas.md), [keyboard-nav-testing.md](docs/keyboard-nav-testing.md) | Dashboard UX and accessibility |
+| [risk-log.md](docs/risk-log.md) | Project risks |
+| [lando-rollout-changes.md](docs/lando-rollout-changes.md) | How CI changed when Docker/Lando were removed |

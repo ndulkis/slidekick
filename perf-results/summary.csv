@@ -1,0 +1,2 @@
+timestamp,test,n,median_ms,p95_ms,min_ms,max_ms,details,note,commit,python,os,raw_csv
+2026-10-15_194402,end_to_end_slide_latency,18,34.873,52.173,16.906,53.105,warmup=2 screen_poll=17.0ms,,e5b7b42,3.11.17,macOS-26.6.2-arm64-arm-64bit,2026-10-15_194402_end_to_end_slide_latency.csv

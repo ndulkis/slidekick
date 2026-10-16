@@ -39,8 +39,11 @@ run_step "Python lint" ruff check .
 run_step "Python formatting" ruff format --check .
 run_step "Environment tests" python -m pytest -q tests/environment
 run_step "Unit tests" python -m pytest -q tests/unit
+run_step "Integration and recognition tests" python -m pytest -q tests/integration tests/recognition
+run_step "Performance and command safety tests" python -m pytest -q tests/performance
 run_step "Smoke tests" python -m pytest -q tests/smoke
 run_step "Frontend lint" npm --prefix frontend run lint
+run_step "Frontend type check" npm --prefix frontend run typecheck
 run_step "Frontend tests" npm --prefix frontend run test
 run_step "Frontend build" npm --prefix frontend run build
 
