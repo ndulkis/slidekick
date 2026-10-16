@@ -17,7 +17,10 @@ import numpy as np
 from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.presentation_adapter import PresentationAdapter
 from slidekick.recognition import camera
-from slidekick.recognition.swipe_recognizer import SWIPE_COOLDOWN
+from slidekick.recognition.swipe_recognizer import (
+    SWIPE_COOLDOWN,
+    GestureRecognitionState,
+)
 
 RESULTS_DIR = Path(__file__).resolve().parents[2] / "perf-results"
 FPS = 30
@@ -90,7 +93,7 @@ class Pipeline:
         self.controller = GestureCommandController(adapter=adapter)
         self.frame = np.zeros((480, 640, 3), dtype=np.uint8)
         self.position_history = deque(maxlen=45)
-        self.last_swipe_time = 0.0
+        self.gesture_state = GestureRecognitionState()
         self.missed_hand_frames = 0
 
     def feed(self, x, fps=FPS):
@@ -99,13 +102,12 @@ class Pipeline:
         (
             gesture_event,
             landmark_event,
-            self.last_swipe_time,
             self.missed_hand_frames,
         ) = camera.process_hand_detection(
             fake_result(x),
             self.frame,
             self.position_history,
-            self.last_swipe_time,
+            self.gesture_state,
             self.missed_hand_frames,
         )
         camera.emit_event(gesture_event, self.controller.handle_event)
@@ -113,11 +115,21 @@ class Pipeline:
         return gesture_event
 
     def run_swipe(self, x_positions) -> int:
-        """Returns perf_counter_ns() at the start of the frame that recognized the swipe."""
+        """Run a swipe after satisfying recognition re-arming conditions."""
+
+        # Allow the cooldown to finish.
         self.clock.now += SWIPE_COOLDOWN + 0.5
 
+        # Keep the hand stationary before starting another gesture.
+        stationary_frames = int(0.5 * FPS) + 1
+
+        for _ in range(stationary_frames):
+            self.feed(x_positions[0])
+
+        # Measure only the actual swipe-processing frames.
         for x in x_positions:
             start = time.perf_counter_ns()
+
             if self.feed(x) is not None:
                 return start
 
