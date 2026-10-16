@@ -1,55 +1,71 @@
-# SlideKick Native Integration Test Checklist
+# feat: Integrate Native Presentation Adapter and Add Command Verification Tests
 
-## Overview
-This document outlines the repeatable baseline tests for the native Windows helper API (`windows_helper.py`). It ensures that physical slide navigation commands (Next, Previous, Pause, Resume) execute correctly on the host operating system via HTTP requests.
+**Related Jira Tasks:** S2-R04-T2, S2-R04-T3
 
-## Prerequisites
-1. The Python virtual environment is active (`.\.venv\Scripts\Activate.ps1`).
-2. Project dependencies (Flask, PyAutoGUI) are installed.
-3. A target presentation (PowerPoint or Google Slides) is open and currently in Full Screen / Presentation mode.
+### Summary
 
-## 1. Automated Validation (Recommended)
-This uses the included PowerShell script to automatically fire commands at the local server.
+This pull request completes the native presentation command integration for SlideKick by connecting the Windows Flask helper API to the existing `KeyboardPresentationAdapter`.
 
-**Steps:**
-1. Start the native helper in your primary terminal:
-   ```powershell
-   python windows_helper.py
+The implementation removes redundant adapter logic, introduces standardized JSON responses for command execution, and provides automated integration tests and a repeatable manual testing script.
 
-2. Open a second PowerShell terminal in the project root and execute the test script:
+These changes establish a functional command execution pathway between HTTP requests and native slideshow navigation while providing a foundation for additional command hardening and reliability improvements in Sprint 3.
 
-PowerShell
-.\scripts\test_slide_commands.ps1
+### Changes Implemented
 
-3. Immediately click on your presentation to give it window focus.
+**1. Native Presentation Helper Integration — `windows_helper.py`**
+- Removed the duplicate keyboard adapter implementation and integrated the existing `KeyboardPresentationAdapter` from the `slidekick` package.
+- Implemented HTTP GET/POST endpoints for `/next`, `/previous`, `/pause`, and `/resume`.
+- Connected each endpoint to the adapter's `execute_command()` method.
+- Added structured JSON responses to report command execution success or failure.
+- Standardized HTTP response handling for successful commands and execution errors.
 
-Expected Results:
+**2. Automated Integration Testing — `tests/integration/test_window_helper.py`**
+- Added automated tests using Flask's test client and `unittest.mock.patch`.
+- Verified that HTTP requests are forwarded to the corresponding presentation adapter commands.
+- Validated successful HTTP responses and returned JSON data without requiring physical keyboard interaction.
+- Provided a repeatable testing approach suitable for local development and continuous integration.
 
-After 5 seconds, the presentation advances one slide forward. The terminal outputs a success status for the next command.
+**3. Manual Presentation Testing — `scripts/test_slide_commands.ps1`**
+- Created a PowerShell script to test native presentation navigation on Windows.
+- Automated HTTP POST requests to the local Flask helper.
+- Introduced a five-second delay to allow the user to focus the slideshow window before command execution.
+- Enabled repeatable verification of next-slide and previous-slide functionality against an active presentation.
 
-After pressing Enter to continue, the script waits 5 seconds and the presentation moves one slide backward. The terminal outputs a success status for the previous command.
+### Manual Integration Test Results
 
-2. Manual Validation
-Use these steps to manually verify individual endpoints without the PowerShell script.
+**Test Environment**
+- Operating System: Windows
+- Python Environment: Python 3.11 virtual environment
+- Native Helper: Flask application running locally on port 8000
+- Presentation Control: PyAutoGUI keyboard simulation
+- Test Execution: PowerShell
 
-Steps:
+| Test Case | Expected Result | Observed Result | Status |
+|---|---|---|---|
+| Start native helper | Flask server starts on port 8000 | Server started successfully | PASS |
+| Next-slide command | Presentation advances one slide | Slide advanced; HTTP 200 returned | PASS |
+| Previous-slide command | Presentation returns one slide | Slide moved backward; HTTP 200 returned | PASS |
+| Command response validation | JSON response reports successful command execution | Command and status fields returned as expected | PASS |
 
-Start the native helper: python windows_helper.py
+**Automated Test Results**
+- Executed the project's unit and integration test suites using `pytest`.
+- All 28 tests passed during local verification.
+- Automated tests use mocked keyboard execution to avoid requiring physical slideshow interaction.
 
-Open a web browser and position it so you can still see your presentation window.
+### Known Limitations and Future Improvements
 
-Trigger the following endpoints by navigating to them in the browser:
+The current presentation adapter relies on keyboard simulation. Therefore, the target slideshow must have keyboard focus for commands to affect the intended application.
 
-Next Slide: http://localhost:8000/next
+Although HTTP responses indicate whether the adapter executed successfully, they do not independently verify that the presentation application received the command or changed slides.
 
-Previous Slide: http://localhost:8000/previous
+These limitations will inform Sprint 3 integration risk assessment, command hardening, fallback handling, and improved execution-status reporting.
 
-Pause (Black Screen): http://localhost:8000/pause
+### Conclusion
 
-Resume: http://localhost:8000/resume
+The implementation establishes and manually verifies native next-slide and previous-slide control through SlideKick's Flask helper and shared presentation adapter.
 
-Expected Results:
+The addition of automated integration tests and a repeatable PowerShell testing script improves testability and provides a foundation for future integration and reliability work.
 
-The presentation must physically respond to each command.
-
-The browser must display a 200 OK JSON response matching this structure: {"command": "<action>", "status": "success"}
+**Jira Progress**
+- **S2-R04-T2:** Implementation and manual verification completed; pending PR review and merge.
+- **S2-R04-T3:** Automated tests and repeatable manual testing script completed; formal test documentation and UI/recognition PR review remain.
