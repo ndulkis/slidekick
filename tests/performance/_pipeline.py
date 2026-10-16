@@ -148,6 +148,14 @@ def summarize(name, samples_ns, details=""):
         "os": platform.platform(),
     }
     print("\n" + " ".join(f"{k}={v}" for k, v in summary.items()))
+
+    # Shows on the GitHub Actions run page.
+    if step_summary := os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(step_summary, "a") as f:
+            f.write(
+                f"**{name}**: median {summary['median_ms']} ms, "
+                f"p95 {summary['p95_ms']} ms (n={summary['n']}, {details})\n"
+            )
     return summary
 
 

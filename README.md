@@ -85,7 +85,7 @@ Never commit real secrets. Add the name to `.env.example` with an empty value, a
 | `tests/recognition/` | Swipe recognizer | Yes |
 | `tests/smoke/` | Slide-control path | Yes |
 | `tests/environment/` | Python/Node versions stay in sync across config files | Yes |
-| `tests/performance/` | Latency benchmarks (see below) | No |
+| `tests/performance/` | Latency benchmarks and command safety (see below) | Yes, except end-to-end |
 
 `tests/conftest.py` fakes `pyautogui`, since CI has no display.
 
@@ -122,7 +122,7 @@ Use `SLIDEKICK_PERF_NOTE` to record test conditions (app, machine, lighting). Ne
 
 | Job | Runs |
 | --- | --- |
-| Lint and Unit Tests | Environment check, Ruff lint + format, environment/unit/integration/recognition tests |
+| Lint and Unit Tests | Environment check, Ruff lint + format, environment/unit/integration/recognition/performance tests (latency shown in the job summary) |
 | Gesture Smoke Tests | `tests/smoke` |
 | Frontend | oxlint, type check, Vitest, production build |
 | Security Checks | Gitleaks, pip-audit, Bandit, `npm audit` (report only) |
