@@ -11,7 +11,7 @@ import time
 
 import numpy as np
 import pytest
-from _pipeline import FIXTURE_SWIPES, FakeClock, Pipeline, report
+from _pipeline import FIXTURE_SWIPES, FakeClock, Pipeline, save, summarize
 
 from slidekick.presentation_adapter import KeyboardPresentationAdapter
 from slidekick.recognition import camera
@@ -76,7 +76,8 @@ class ScreenWatcher:
                 after = time.perf_counter_ns()
                 self.grab_ns.append(after - before)
                 if np.mean(shot != baseline) > CHANGE_FRACTION:
-                    result["changed_ns"] = before
+                    # End of capture: may overstate by one poll, never understates.
+                    result["changed_ns"] = after
                     return
 
         thread = threading.Thread(target=poll)
@@ -84,7 +85,7 @@ class ScreenWatcher:
         return thread, result
 
 
-def test_end_to_end_slide_latency(tmp_path, monkeypatch):
+def test_end_to_end_slide_latency(monkeypatch):
     mss = pytest.importorskip("mss")
 
     clock = FakeClock()
@@ -129,8 +130,13 @@ def test_end_to_end_slide_latency(tmp_path, monkeypatch):
 
     samples_ns = [total for *_, warmup, _, _, total in rows if not warmup]
     grab_ms = sorted(watcher.grab_ns)[len(watcher.grab_ns) // 2] / 1e6
-    report(
+    summary = summarize(
         "end_to_end_slide_latency",
+        samples_ns,
+        details=f"warmup={WARMUP} screen_poll={grab_ms:.1f}ms",
+    )
+    save(
+        summary,
         [
             "trial",
             "command",
@@ -140,7 +146,4 @@ def test_end_to_end_slide_latency(tmp_path, monkeypatch):
             "total_ns",
         ],
         rows,
-        samples_ns,
-        tmp_path,
-        extra=f"warmup={WARMUP} screen_poll={grab_ms:.1f}ms ",
     )

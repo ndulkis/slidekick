@@ -2,7 +2,7 @@
 
 import time
 
-from _pipeline import FIXTURE_SWIPES, FakeClock, Pipeline, report
+from _pipeline import FIXTURE_SWIPES, FakeClock, Pipeline, summarize
 
 from slidekick.presentation_adapter import PresentationAdapter
 from slidekick.recognition import camera
@@ -37,7 +37,7 @@ class TimingAdapter(PresentationAdapter):
         return self._record("end")
 
 
-def test_recognition_to_command_latency(tmp_path, monkeypatch):
+def test_recognition_to_command_latency(monkeypatch):
     clock = FakeClock()
     monkeypatch.setattr(camera, "time", clock)
     adapter = TimingAdapter()
@@ -55,11 +55,4 @@ def test_recognition_to_command_latency(tmp_path, monkeypatch):
         if i >= WARMUP:
             samples_ns.append(new_calls[0][1] - start)
 
-    report(
-        "recognition_to_command_latency",
-        ["sample", "command", "latency_ns"],
-        [(i, FIXTURE_SWIPES[i % 2][0], ns) for i, ns in enumerate(samples_ns)],
-        samples_ns,
-        tmp_path,
-        extra=f"warmup={WARMUP} ",
-    )
+    summarize("recognition_to_command_latency", samples_ns, details=f"warmup={WARMUP}")

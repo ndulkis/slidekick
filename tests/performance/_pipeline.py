@@ -4,9 +4,11 @@ import csv
 import os
 import platform
 import statistics
+import subprocess
 import time
 from collections import deque
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,6 +18,7 @@ from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.recognition import camera
 from slidekick.recognition.swipe_recognizer import SWIPE_COOLDOWN
 
+RESULTS_DIR = Path(__file__).resolve().parents[2] / "perf-results"
 FPS = 30
 FIXTURE_SWIPES = [
     ("next", [0.30 + 0.03 * i for i in range(12)]),
@@ -87,20 +90,48 @@ class Pipeline:
         raise AssertionError("swipe was never recognized")
 
 
-def report(name, header, rows, samples_ns, tmp_path, extra=""):
-    """Write CSV (to SLIDEKICK_PERF_DIR or tmp_path) and print median/p95."""
-    out_dir = Path(os.environ.get("SLIDEKICK_PERF_DIR") or tmp_path)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = out_dir / f"{name}.csv"
+def summarize(name, samples_ns, details=""):
+    """Print and return median/p95 and run context."""
+    commit = subprocess.run(
+        ["git", "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.strip()
+    ms = [ns / 1e6 for ns in samples_ns]
+    summary = {
+        "timestamp": datetime.now().astimezone().strftime("%Y-%m-%d_%H%M%S"),
+        "test": name,
+        "n": len(ms),
+        "median_ms": round(statistics.median(ms), 3),
+        "p95_ms": round(statistics.quantiles(ms, n=100, method="inclusive")[94], 3),
+        "min_ms": round(min(ms), 3),
+        "max_ms": round(max(ms), 3),
+        "details": details,
+        "note": os.environ.get("SLIDEKICK_PERF_NOTE", ""),
+        "commit": commit or "unknown",
+        "python": platform.python_version(),
+        "os": platform.platform(),
+    }
+    print("\n" + " ".join(f"{k}={v}" for k, v in summary.items()))
+    return summary
+
+
+def save(summary, header, rows):
+    """Write raw rows to perf-results/<timestamp>_<test>.csv and append to summary.csv."""
+    RESULTS_DIR.mkdir(exist_ok=True)
+    csv_path = RESULTS_DIR / f"{summary['timestamp']}_{summary['test']}.csv"
     with csv_path.open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
 
-    median_ms = statistics.median(samples_ns) / 1e6
-    p95_ms = statistics.quantiles(samples_ns, n=100)[94] / 1e6
-    print(
-        f"\n{name}: n={len(samples_ns)} median={median_ms:.3f}ms p95={p95_ms:.3f}ms "
-        f"min={min(samples_ns) / 1e6:.3f}ms max={max(samples_ns) / 1e6:.3f}ms {extra}"
-        f"python={platform.python_version()} os={platform.platform()} raw={csv_path}"
-    )
+    summary = {**summary, "raw_csv": csv_path.name}
+    summary_path = RESULTS_DIR / "summary.csv"
+    new_file = not summary_path.exists()
+    with summary_path.open("a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(summary))
+        if new_file:
+            writer.writeheader()
+        writer.writerow(summary)
+    print(f"saved {csv_path}")
