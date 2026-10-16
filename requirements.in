@@ -27,3 +27,6 @@ ruff
 pip-tools
 
 pyautogui
+# Screen capture for the local end-to-end latency test
+# (tests/performance/test_end_to_end_slide_latency.py).
+mss
