@@ -7,6 +7,9 @@ interface SessionMessageProps {
 const messages: Partial<Record<SessionStatus, string>> = {
   loading: 'Starting camera and gesture recognition...',
   ready: 'SlideKick is ready. Start a session to begin.',
+  active: 'Gesture recognition is on. Gestures will control your presentation.',
+  paused: 'Gesture recognition paused. Gestures will not control your presentation.',
+  ended: "Session ended. Start a new session when you're ready.",
   error:
     'Something required by this session is unavailable. Check camera access and try again.',
 }

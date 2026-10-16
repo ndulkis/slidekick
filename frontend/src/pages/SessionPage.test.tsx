@@ -82,6 +82,27 @@ describe('SessionPage', () => {
     expect(button('Pause session')).toBeDisabled()
   })
 
+  it('shows a message for each session state', () => {
+    render(<SessionPage />)
+
+    startSession()
+    expect(
+      screen.getByText('Gesture recognition is on. Gestures will control your presentation.'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(button('Pause session'))
+    expect(
+      screen.getByText('Gesture recognition paused. Gestures will not control your presentation.'),
+    ).toBeInTheDocument()
+
+    fireEvent.click(button('Resume session'))
+    fireEvent.click(button('End session'))
+    expect(
+      screen.getByText("Session ended. Start a new session when you're ready."),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Camera off')).toBeInTheDocument()
+  })
+
   it('blocks actions that are not valid in the current state', () => {
     render(<SessionPage />)
 
