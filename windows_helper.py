@@ -41,4 +41,5 @@ def trigger_resume() -> tuple[Response, int]:
 
 if __name__ == "__main__":
     print("Starting native Windows presentation helper on port 8000...")
+
     app.run(host="0.0.0.0", port=8000)
