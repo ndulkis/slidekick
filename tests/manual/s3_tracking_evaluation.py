@@ -3,7 +3,6 @@ import math
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from pathlib import Path
 
 import cv2
 import mediapipe as mp
@@ -17,10 +16,9 @@ from slidekick.recognition.camera import (
     process_hand_detection,
     should_close_window,
 )
+from slidekick.recognition.evaluation_runs import get_or_create_evaluation_run
 from slidekick.recognition.sample_recorder import SampleRecorder
 from slidekick.recognition.swipe_recognizer import GestureRecognitionState
-
-OUTPUT_PATH = Path("data/evaluation/s2_recognition_samples.jsonl")
 
 PROTOCOL_VERSION = "s3-r03-t2-lifecycle-030-v1"
 
@@ -261,20 +259,31 @@ def print_collection_summary(output_path):
 
 
 def run_evaluation():
+    # Build the full ordered list of evaluation cases.
     evaluation_sequence = build_evaluation_sequence()
 
-    recorder = SampleRecorder(OUTPUT_PATH)
+    # Resume the latest compatible unfinished evaluation,
+    # or create a uniquely named dataset for a new run.
+    output_path, sequence_index = get_or_create_evaluation_run(
+        protocol_version=PROTOCOL_VERSION,
+        evaluation_sequence=evaluation_sequence,
+        sprint="S3",
+        role="R03",
+    )
 
-    # Allows a partially completed evaluation file to resume where it stopped.
-    sequence_index = count_completed_s3_trials(OUTPUT_PATH)
+    # Append completed trial recordings to the selected dataset.
+    recorder = SampleRecorder(output_path)
+
+    print(f"Evaluation dataset: {output_path.name}")
+    print(f"Progress: {sequence_index}/{len(evaluation_sequence)}")
 
     if sequence_index >= len(evaluation_sequence):
         print("Evaluation dataset is already complete.")
-        print_collection_summary(OUTPUT_PATH)
+        print_collection_summary(output_path)
         return
 
     print("SlideKick S3-R03-T1 Recognition Evaluation")
-    print(f"Output: {OUTPUT_PATH}")
+    print(f"Output: {output_path}")
     print(f"Total planned trials: {len(evaluation_sequence)}")
     print(f"Completed trials: {sequence_index}")
     print()
@@ -521,7 +530,7 @@ def run_evaluation():
     if collection_complete:
         print("\nEvaluation collection complete.")
 
-    print_collection_summary(OUTPUT_PATH)
+    print_collection_summary(output_path)
 
 
 if __name__ == "__main__":
