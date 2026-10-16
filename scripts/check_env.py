@@ -178,9 +178,18 @@ def check_node_modules() -> Result:
             "frontend/node_modules is missing",
             "Run `npm --prefix frontend ci`.",
         )
-    if shutil.which("npm") is None:
-        return Result(FAIL, name, "npm not found", "Install Node (e.g. `nvm install`).")
-    result = run(["npm", "ls", "--depth=0"], cwd=FRONTEND)
+    npm_command = "npm.cmd" if os.name == "nt" else "npm"
+
+    if shutil.which(npm_command) is None:
+        return Result(
+            FAIL,
+            name,
+            "npm not found",
+            "Install Node (e.g. `nvm install`).",
+        )
+
+    result = run([npm_command, "ls", "--depth=0"], cwd=FRONTEND)
+
     if result.returncode != 0:
         problems = [
             line.strip()
