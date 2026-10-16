@@ -417,6 +417,7 @@ def run_camera(
     # A. Initialize camera window and capture device
     # --------------------------------------------------------
 
+def run_camera(event_handler=None, key_handler=None):
     window_name = create_camera_window()
 
     # Camera index 0 selects the computer's default webcam.
@@ -660,6 +661,9 @@ def run_camera(
             # Close when Q is pressed or the window is dismissed.
             if should_close_window(window_name, key):
                 break
+
+            if key_handler is not None:
+                key_handler(key)
 
     # --------------------------------------------------------
     # L. Release camera resources
