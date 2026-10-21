@@ -400,6 +400,7 @@ def print_recognition_event(event):
 def run_camera(
     event_handler=None,
     calibration: GestureCalibration | None = None,
+    key_handler=None,
 ):
     """Run the SlideKick camera and gesture recognition loop.
 
@@ -416,8 +417,6 @@ def run_camera(
     # --------------------------------------------------------
     # A. Initialize camera window and capture device
     # --------------------------------------------------------
-
-def run_camera(event_handler=None, key_handler=None):
     window_name = create_camera_window()
 
     # Camera index 0 selects the computer's default webcam.
