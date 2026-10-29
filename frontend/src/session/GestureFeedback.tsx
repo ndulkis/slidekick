@@ -24,6 +24,25 @@ function GestureFeedback({ status, event }: GestureFeedbackProps) {
     )
   }
 
+  // Gestures don't control the presentation while paused or after the
+  // session ends, so don't show a gesture or confidence that could suggest
+  // otherwise.
+  if (status === 'paused') {
+    return (
+      <div className="gesture-feedback" role="status">
+        Gesture recognition paused
+      </div>
+    )
+  }
+
+  if (status === 'ended') {
+    return (
+      <div className="gesture-feedback" role="status">
+        Gesture recognition off
+      </div>
+    )
+  }
+
   const gesture = event?.gesture ?? 'none'
 
   return (

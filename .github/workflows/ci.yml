@@ -73,8 +73,19 @@ jobs:
       - name: Run unit tests
         run: python -m pytest -q tests/unit
 
-      - name: Run integration and recognition tests
-        run: python -m pytest -q tests/integration tests/recognition
+      # Deterministic gesture recognition regressions.
+      # Runs without a webcam using synthetic hand landmarks.
+      - name: Run recognition regression tests
+        run: python -m pytest -q tests/recognition
+
+      - name: Run integration tests
+        run: python -m pytest -q tests/integration
+
+      # Command safety tests gate the merge. Latency is report-only (no time
+      # limit until runner variability is known); see the job summary. The
+      # end-to-end test skips itself (needs a display).
+      - name: Run performance and command safety tests
+        run: python -m pytest -q -s tests/performance
 
   gesture-smoke-test:
     name: Gesture Smoke Tests

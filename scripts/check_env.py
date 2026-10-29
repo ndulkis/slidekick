@@ -189,7 +189,6 @@ def check_node_modules() -> Result:
         )
 
     result = run([npm_command, "ls", "--depth=0"], cwd=FRONTEND)
-
     if result.returncode != 0:
         problems = [
             line.strip()

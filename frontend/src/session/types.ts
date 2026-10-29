@@ -1,4 +1,6 @@
-export type SessionStatus = 'loading' | 'ready' | 'active' | 'paused' | 'error'
+import type { SessionState } from '../core/sessionContracts'
+
+export type SessionStatus = 'loading' | 'ready' | 'active' | 'paused' | 'ended' | 'error'
 
 export type PresentationConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
 
@@ -26,7 +28,27 @@ export const sessionStatusLabels: Record<SessionStatus, string> = {
   ready: 'Ready',
   active: 'Active',
   paused: 'Paused',
+  ended: 'Ended',
   error: 'Error',
+}
+
+const sessionStateToStatus: Record<SessionState, SessionStatus> = {
+  idle: 'ready',
+  running: 'active',
+  paused: 'paused',
+  ended: 'ended',
+}
+
+/**
+ * Maps the useSession lifecycle state to what the Session components show.
+ * Loading and error come from the camera/recognition side, not the session
+ * lifecycle, so they're passed in as an override when present.
+ */
+export function toSessionStatus(
+  state: SessionState,
+  override?: 'loading' | 'error',
+): SessionStatus {
+  return override ?? sessionStateToStatus[state]
 }
 
 export const presentationStatusLabels: Record<PresentationConnectionStatus, string> = {
