@@ -1,7 +1,10 @@
 """Runner keyboard controls and failure behavior without real camera imports."""
 
 import importlib.util
+import sys
+import types
 from pathlib import Path
+from unittest.mock import Mock
 
 from slidekick.contracts import SessionState
 from slidekick.gesture_command_controller import GestureCommandController
@@ -13,7 +16,19 @@ spec = importlib.util.spec_from_file_location(
 )
 assert spec and spec.loader
 runner = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(runner)
+# The runner only needs run_camera as an imported name; keep hardware libraries
+# (MediaPipe/OpenCV) out of collection so this test also works on CI runners.
+original_camera = sys.modules.get("slidekick.recognition.camera")
+fake_camera = types.ModuleType("slidekick.recognition.camera")
+fake_camera.run_camera = Mock()
+try:
+    sys.modules["slidekick.recognition.camera"] = fake_camera
+    spec.loader.exec_module(runner)
+finally:
+    if original_camera is None:
+        sys.modules.pop("slidekick.recognition.camera", None)
+    else:
+        sys.modules["slidekick.recognition.camera"] = original_camera
 
 
 class Adapter:
