@@ -1,0 +1,91 @@
+"""Baseline probe of the ORIGINAL controller, run before remediation.
+
+Uses a fake pyautogui so no real key is pressed.
+"""
+
+import sys
+from unittest import mock
+
+fake = mock.MagicMock(name="pyautogui")
+sys.modules["pyautogui"] = fake
+
+from slidekick.contracts import SessionState  # noqa: E402
+from slidekick.gesture_command_controller import GestureCommandController  # noqa: E402
+from slidekick.presentation_adapter import KeyboardPresentationAdapter  # noqa: E402
+from slidekick.session_coordinator import SessionCoordinator  # noqa: E402
+
+
+def swipe(name):
+    return {"event_type": "gesture", "gesture": name, "confidence": 0.9}
+
+
+def probe(label, fn):
+    fake.reset_mock()
+    try:
+        outcome = fn()
+    except Exception as exc:  # noqa: BLE001
+        outcome = f"raised {type(exc).__name__}"
+    print(f"{label:<58} outcome={outcome!r:<28} presses={fake.press.call_args_list}")
+
+
+def make(bindings=None):
+    controller = GestureCommandController(KeyboardPresentationAdapter(), bindings)
+    return SessionCoordinator(gestures=controller), controller
+
+
+def end_binding():
+    s, _ = make({"swipe_right": "end"})
+    s.start()
+    return s.handle_event(swipe("swipe_right"))
+
+
+def shortcut_binding_loads():
+    make({"swipe_right": "ctrl+w"})
+    return "accepted at load"
+
+
+def unhashable_binding_loads():
+    make({"swipe_right": ["next"]})
+    return "accepted at load"
+
+
+def unhashable_direct_dispatch():
+    _, c = make({"swipe_right": ["next"]})
+    return c.handle_event(swipe("swipe_right"))
+
+
+def non_string_gesture_key_loads():
+    make({123: "next"})
+    return "accepted at load"
+
+
+def mutate_after_construction():
+    s, c = make()
+    s.start()
+    c.gesture_bindings["fist"] = "end"
+    return s.handle_event(swipe("fist"))
+
+
+def direct_controller_while_idle():
+    _, c = make()
+    return c.handle_event(swipe("swipe_right"))
+
+
+def adapter_rejects_end():
+    return KeyboardPresentationAdapter().execute_command("end")["status"]
+
+
+def adapter_rejects_shortcut():
+    return KeyboardPresentationAdapter().execute_command("ctrl+alt+delete")["status"]
+
+
+print("G-probe  baseline on original code")
+probe("bind swipe_right -> end, RUNNING session", end_binding)
+probe("load binding swipe_right -> 'ctrl+w'", shortcut_binding_loads)
+probe("load binding swipe_right -> ['next']", unhashable_binding_loads)
+probe("dispatch binding swipe_right -> ['next']", unhashable_direct_dispatch)
+probe("load binding with non-string gesture id 123", non_string_gesture_key_loads)
+probe("mutate gesture_bindings after construction", mutate_after_construction)
+probe("controller used directly while session IDLE", direct_controller_while_idle)
+probe("adapter execute_command('end')", adapter_rejects_end)
+probe("adapter execute_command('ctrl+alt+delete')", adapter_rejects_shortcut)

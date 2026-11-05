@@ -1,0 +1,13 @@
+G-probe  baseline on original code
+Simulating: ESCAPE (End Presentation)
+bind swipe_right -> end, RUNNING session                   outcome=True                         presses=[call('esc')]
+load binding swipe_right -> 'ctrl+w'                       outcome='accepted at load'           presses=[]
+load binding swipe_right -> ['next']                       outcome='accepted at load'           presses=[]
+dispatch binding swipe_right -> ['next']                   outcome='raised TypeError'           presses=[]
+load binding with non-string gesture id 123                outcome='accepted at load'           presses=[]
+Simulating: ESCAPE (End Presentation)
+mutate gesture_bindings after construction                 outcome=True                         presses=[call('esc')]
+Simulating: RIGHT arrow (Next Slide)
+controller used directly while session IDLE                outcome=True                         presses=[call('right')]
+adapter execute_command('end')                             outcome='error'                      presses=[]
+adapter execute_command('ctrl+alt+delete')                 outcome='error'                      presses=[]
