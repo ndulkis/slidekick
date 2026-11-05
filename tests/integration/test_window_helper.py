@@ -1,9 +1,6 @@
 from unittest.mock import patch
-
 import pytest
-
 from windows_helper import app
-
 
 @pytest.mark.parametrize(
     ("endpoint", "command"),
@@ -24,7 +21,6 @@ def test_helper_command_endpoint_success(endpoint, command):
             "status": "success",
             "command": command,
         }
-
         response = client.post(endpoint)
 
     assert response.status_code == 200
@@ -47,7 +43,6 @@ def test_helper_command_endpoint_failure():
             "command": "next",
             "message": "Mocked failure",
         }
-
         response = client.post("/next")
 
     assert response.status_code == 500
@@ -58,3 +53,34 @@ def test_helper_command_endpoint_failure():
         "message": "Mocked failure",
     }
     mock_execute.assert_called_once_with("next")
+
+
+# ---------------------------------------------------------
+# S4-SOC2 SECURITY COMPLIANCE TESTS (CC6.6)
+# ---------------------------------------------------------
+
+def test_health_endpoint_success():
+    """S4-SOC2-NH3: Verify the health check endpoint returns 200 OK via GET."""
+    with app.test_client() as client:
+        response = client.get("/health")
+    
+    assert response.status_code == 200
+    assert response.json == {"status": "ok", "service": "slidekick-native-helper"}
+
+
+@pytest.mark.parametrize("endpoint", ["/next", "/previous", "/pause", "/resume"])
+def test_helper_command_method_restriction(endpoint):
+    """S4-SOC2-NH3: Verify command endpoints strictly reject GET requests."""
+    with app.test_client() as client:
+        # We enforce POST-only to prevent accidental execution via browser navigation
+        response = client.get(endpoint)
+    
+    assert response.status_code == 405  # Method Not Allowed
+
+
+def test_unsupported_route_rejection():
+    """S4-SOC2-NH3: Verify unsupported routes are properly rejected."""
+    with app.test_client() as client:
+        response = client.post("/random_unsupported_hacker_route")
+    
+    assert response.status_code == 404  # Not Found
