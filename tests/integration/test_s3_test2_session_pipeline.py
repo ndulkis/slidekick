@@ -65,11 +65,17 @@ def test_recognition_events_reach_adapter_only_while_running():
     assert adapter.calls == ["next", "previous", "next", "previous"]
 
 
-@pytest.mark.parametrize("event", [
-    None, {}, "swipe_right", {"event_type": "landmarks"},
-    {"event_type": "gesture", "gesture": None},
-    {"event_type": "gesture", "gesture": "unknown"},
-])
+@pytest.mark.parametrize(
+    "event",
+    [
+        None,
+        {},
+        "swipe_right",
+        {"event_type": "landmarks"},
+        {"event_type": "gesture", "gesture": None},
+        {"event_type": "gesture", "gesture": "unknown"},
+    ],
+)
 def test_unrecognized_or_malformed_camera_events_cannot_send_keys(event):
     session, adapter = make_system()
     session.start()
@@ -90,9 +96,9 @@ def test_session_pause_resume_and_end_never_invoke_slideshow_shortcuts():
 
 
 def test_custom_mapping_routes_through_coordinator_and_rejects_unknown_command():
-    session, adapter = make_system({
-        "swipe_right": "previous", "swipe_left": "arbitrary_hotkey"
-    })
+    session, adapter = make_system(
+        {"swipe_right": "previous", "swipe_left": "arbitrary_hotkey"}
+    )
     session.start()
     assert session.handle_event(gesture("swipe_right")) is True
     with pytest.raises(PresentationCommandError, match="not executed"):
