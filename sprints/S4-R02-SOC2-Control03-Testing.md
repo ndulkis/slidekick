@@ -36,8 +36,7 @@ Result: 5 vulnerabilities found (3 high, 2 moderate), all in dev dependencies
 | source-map-js | high | denial of service via source-map section offsets |
 | @vitest/mocker (vitest) | moderate | code injection via mock registration, Windows path traversal |
 
-A fix is available for all of them via `npm audit fix`. Not run yet —
-remediation and retest planned for next session.
+A fix is available for all of them via `npm audit fix`. Fixed in Test 4.
 
 ## Test 3: CI Security Gate
 
@@ -53,14 +52,22 @@ dependency scan is informational only right now.
 
 ## Test 4: Remediation Testing
 
-Needed because Test 2 found issues to fix. Not run yet. Plan for next
-session:
+Run on November 5, 2026 on branch `feature/S4-R02-SOC2-C03-dependency-scan`.
 
-1. Run `npm audit fix`
-2. Rerun the frontend test suite to confirm nothing broke
-3. Rerun `npm audit` to confirm the count drops to zero
-4. Note any vulnerability that can't be fixed without a breaking
-   major-version bump
+1. `npm audit fix` updated 19 packages. Only `frontend/package-lock.json`
+   changed; `package.json` did not, so no major-version bumps were needed.
+2. Reran `npm audit`: 0 vulnerabilities (was 5: 3 high, 2 moderate).
+
+| Package | Before | After |
+|---|---|---|
+| vite | 8.3.0–8.3.2 | 8.3.6 |
+| source-map-js | 1.0.0–1.2.1 | 1.2.2 |
+| undici | 7.0.0–7.30.0 | 7.30.1 |
+| vitest / @vitest/mocker | ≤4.1.11 | 4.1.12 |
+
+3. Regression checks after the update: type check, lint, and build pass;
+   88/88 frontend tests pass (same as before the update).
+4. No vulnerabilities required a breaking major-version upgrade.
 
 ## Follow-up: CI Security Gate
 
