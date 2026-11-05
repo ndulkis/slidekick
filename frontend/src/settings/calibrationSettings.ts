@@ -76,7 +76,7 @@ export const DEFAULT_CALIBRATION: CalibrationSettings = {
 
 export const CALIBRATION_STORAGE_KEY = 'slidekick.calibrationProfile'
 
-type CalibrationStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+export type CalibrationStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
 function browserStorage(): CalibrationStorage | undefined {
   // Accessing localStorage can throw when site data is blocked.

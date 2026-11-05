@@ -1,0 +1,54 @@
+.calibration-section {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.calibration-intro {
+  margin-bottom: 16px;
+}
+
+.calibration-slider {
+  margin: 16px 0;
+}
+
+.calibration-slider-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.calibration-slider input[type='range'] {
+  width: 100%;
+  margin: 8px 0 4px;
+}
+
+.calibration-slider-description {
+  font-size: 0.9em;
+}
+
+.calibration-actions {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.calibration-status,
+.calibration-error {
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+.calibration-error {
+  color: var(--text-h);
+  border-left: 3px solid #b00020;
+  padding-left: 8px;
+}
+
+.calibration-slider input[type='range']:focus-visible,
+.calibration-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
