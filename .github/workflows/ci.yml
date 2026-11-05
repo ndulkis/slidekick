@@ -211,7 +211,7 @@ jobs:
 
       - name: Scan Frontend dependencies (npm audit)
         working-directory: frontend
-        run: npm audit || true
+        run: npm audit --audit-level=high
 
   # ---------------------------------------------------------------------------
   # OPTIONAL PRODUCTION-ONLY CHECKS
