@@ -15,25 +15,31 @@ def _build_response(command: str) -> tuple[Response, int]:
     return jsonify(result), status_code
 
 
-@app.route("/next", methods=["GET", "POST"])
+@app.route("/health", methods=["GET"])
+def health_check() -> tuple[Response, int]:
+    """Verify the helper is running and accepting requests."""
+    return jsonify({"status": "ok", "service": "slidekick-native-helper"}), 200
+
+
+@app.route("/next", methods=["POST"])
 def trigger_next() -> tuple[Response, int]:
     """Trigger the next slide command."""
     return _build_response("next")
 
 
-@app.route("/previous", methods=["GET", "POST"])
+@app.route("/previous", methods=["POST"])
 def trigger_previous() -> tuple[Response, int]:
     """Trigger the previous slide command."""
     return _build_response("previous")
 
 
-@app.route("/pause", methods=["GET", "POST"])
+@app.route("/pause", methods=["POST"])
 def trigger_pause() -> tuple[Response, int]:
     """Trigger the pause presentation command."""
     return _build_response("pause")
 
 
-@app.route("/resume", methods=["GET", "POST"])
+@app.route("/resume", methods=["POST"])
 def trigger_resume() -> tuple[Response, int]:
     """Trigger the resume presentation command."""
     return _build_response("resume")
@@ -41,5 +47,4 @@ def trigger_resume() -> tuple[Response, int]:
 
 if __name__ == "__main__":
     print("Starting native Windows presentation helper on port 8000...")
-
     app.run(host="127.0.0.1", port=8000)
