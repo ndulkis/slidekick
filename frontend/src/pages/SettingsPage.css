@@ -8,6 +8,13 @@
   margin-bottom: 16px;
 }
 
+.calibration-note {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
 .calibration-slider {
   margin: 16px 0;
 }

@@ -36,4 +36,16 @@ describe('App routing', () => {
       screen.getByRole('heading', { name: 'Settings' }),
     ).toBeInTheDocument()
   })
+
+  it('shows the gesture calibration section on the settings view', () => {
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByRole('heading', { name: 'Gesture Calibration' }),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole('slider')).toHaveLength(4)
+  })
 })

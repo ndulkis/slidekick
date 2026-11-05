@@ -46,6 +46,10 @@ function GestureCalibrationSection({ storage }: GestureCalibrationSectionProps) 
         Adjust how SlideKick recognizes your swipes. Your settings are saved in
         this browser.
       </p>
+      <p className="calibration-note">
+        Note: these settings aren't applied to gesture recognition yet. They'll
+        take effect once SlideKick's recognition is connected to this app.
+      </p>
 
       {CALIBRATION_CONTROLS.map((control) => (
         <CalibrationSlider

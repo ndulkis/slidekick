@@ -40,6 +40,13 @@ describe('GestureCalibrationSection', () => {
     expect(slider('Time between gestures').value).toBe(String(DEFAULT_CALIBRATION.cooldown))
   })
 
+  it('says the settings are not applied to recognition yet', () => {
+    render(<GestureCalibrationSection storage={memoryStorage()} />)
+    expect(
+      screen.getByText(/these settings aren't applied to gesture recognition yet/),
+    ).toBeInTheDocument()
+  })
+
   it('loads a saved profile', () => {
     const storage = memoryStorage({
       [CALIBRATION_STORAGE_KEY]: JSON.stringify({ ...DEFAULT_CALIBRATION, cooldown: 2.5 }),
