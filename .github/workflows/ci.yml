@@ -1,3 +1,4 @@
+
 name: SlideKick CI
 
 on:
@@ -80,6 +81,17 @@ jobs:
 
       - name: Run integration tests
         run: python -m pytest -q tests/integration
+
+      # Sprint 4: deterministic recognition and integration regression checks.
+      # No webcam or display required.
+      - name: Sprint 4 Recognition Regression and Integration Checks
+        run: |
+          python -m pytest -q \
+            tests/unit/test_static_gesture_recognizer.py \
+            tests/unit/test_gesture_arbitration.py \
+            tests/unit/test_gesture_command_controller.py \
+            tests/unit/test_sample_recorder.py \
+            tests/integration/test_static_gesture_arbitration.py
 
       # Command safety tests gate the merge. Latency is report-only (no time
       # limit until runner variability is known); see the job summary. The
