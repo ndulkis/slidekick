@@ -2,7 +2,7 @@
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 
@@ -16,7 +16,7 @@ class EnrollmentSession:
         self.status = (
             "collecting"  # States: collecting, validating, completed, cancelled
         )
-        self.created_at = datetime.now(timezone.utc).isoformat()
+        self.created_at = datetime.now(UTC).isoformat()
 
     def add_sample(self, landmarks: list) -> dict:
         """Add a landmark sample to the current session."""
@@ -27,7 +27,7 @@ class EnrollmentSession:
             return {"error": "Invalid sample data."}
 
         self.samples.append(
-            {"timestamp": datetime.now(timezone.utc).isoformat(), "landmarks": landmarks}
+            {"timestamp": datetime.now(UTC).isoformat(), "landmarks": landmarks}
         )
 
         if len(self.samples) >= self.target_samples:
