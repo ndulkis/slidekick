@@ -69,9 +69,22 @@ Run on November 5, 2026 on branch `feature/S4-R02-SOC2-C03-dependency-scan`.
    88/88 frontend tests pass (same as before the update).
 4. No vulnerabilities required a breaking major-version upgrade.
 
-## Follow-up: CI Security Gate
+## CI Security Gate Fix
 
 Test 3 found that `npm audit || true` in `.github/workflows/ci.yml` line 214
-means the frontend scan can never fail the build. Proposed fix for next
-session: remove `|| true`, or use `npm audit --audit-level=high` so CI fails
-on real vulnerabilities instead of only logging them.
+meant the frontend scan could never fail the build. Fixed by changing it to
+`npm audit --audit-level=high`, so high and critical findings fail CI. This
+was done after Test 4, so the change doesn't block anyone's pull requests.
+
+Verified on November 5, 2026 by running both commands against the frontend
+lock file from before and after the Test 4 fix (`npm audit --package-lock-only`
+in a scratch folder):
+
+| Lock file | `npm audit \|\| true` (old) | `npm audit --audit-level=high` (new) |
+|---|---|---|
+| Before fix: 5 vulnerabilities (3 high) | exit 0, CI passes | exit 1, CI fails |
+| After fix: 0 vulnerabilities | exit 0, CI passes | exit 0, CI passes |
+
+Result: the old step passed even with 3 high-severity vulnerabilities. The new
+step blocks them and passes once they're fixed. The frontend scan now enforces
+the same way the Python scan does.
