@@ -19,8 +19,17 @@ from collections import deque
 import cv2  # OpenCV for webcam capture and frame processing
 import mediapipe as mp  # MediaPipe for hand detection and tracking
 
-from .events import create_landmark_event
+from .events import create_gesture_event, create_landmark_event
+from .gesture_arbitration import (
+    GestureArbitrationState,
+    SwipeStaticArbitrationState,
+    arbitrate_static_gesture,
+)
 from .sample_recorder import SampleRecorder
+from .static_gesture_recognizer import (
+    StaticGestureState,
+    get_static_gesture_candidate,
+)
 from .swipe_recognizer import (
     GestureCalibration,
     GestureRecognitionState,
@@ -33,6 +42,7 @@ from .swipe_recognizer import (
 
 # Path to the MediaPipe Gesture Recognizer task model.
 MODEL_PATH = "models/gesture_recognizer.task"
+CUSTOM_MODEL_PATH = "models/custom_gesture.task"
 
 # Initial dimensions of the SlideKick camera preview window.
 WINDOW_WIDTH = 960
@@ -121,7 +131,7 @@ def create_recognizer_options():
     # VIDEO mode allows MediaPipe to track hands across
     # consecutive frames rather than processing isolated images.
     options = mp.tasks.vision.GestureRecognizerOptions(
-        base_options=mp.tasks.BaseOptions(model_asset_path=MODEL_PATH),
+        base_options=mp.tasks.BaseOptions(model_asset_path=CUSTOM_MODEL_PATH),
         running_mode=mp.tasks.vision.RunningMode.VIDEO,
         num_hands=1,
         min_hand_detection_confidence=HAND_DETECTION_CONFIDENCE,
@@ -401,6 +411,7 @@ def run_camera(
     event_handler=None,
     calibration: GestureCalibration | None = None,
     key_handler=None,
+    enable_static_events=False,
 ):
     """Run the SlideKick camera and gesture recognition loop.
 
@@ -446,6 +457,10 @@ def run_camera(
 
     # Store gesture lifecycle information across camera frames.
     gesture_state = GestureRecognitionState()
+
+    static_state = StaticGestureState()
+    motion_state = GestureArbitrationState()
+    arbitration_state = SwipeStaticArbitrationState()
 
     # Track consecutive frames where no hand was detected.
     missed_hand_frames = 0
@@ -551,6 +566,43 @@ def run_camera(
                 missed_hand_frames,
                 calibration=calibration,
             )
+
+            # Extract static classification from the same MediaPipe result.
+            static_candidate = get_static_gesture_candidate(result)
+
+            # Use the first hand's landmarks when available.
+            static_hand_landmarks = (
+                result.hand_landmarks[0] if result.hand_landmarks else []
+            )
+
+            # Resolve static recognition against movement and accepted swipes.
+            accepted_static = arbitrate_static_gesture(
+                candidate=static_candidate,
+                hand_landmarks=static_hand_landmarks,
+                current_time=time.monotonic(),
+                motion_state=motion_state,
+                static_state=static_state,
+                arbitration_state=arbitration_state,
+                swipe_event=gesture_event,
+            )
+
+            # Convert accepted static recognition into a canonical gesture event.
+            static_gesture_event = None
+
+            if accepted_static is not None:
+                static_gesture_event = create_gesture_event(
+                    gesture_name=accepted_static["gesture"],
+                    confidence=accepted_static["confidence"],
+                    timestamp=time.monotonic(),
+                )
+
+                # Only dispatch accepted static gestures when explicitly enabled.
+                if enable_static_events:
+                    emit_event(static_gesture_event, event_handler)
+
+                # Diagnostic only: static commands remain disabled.
+                print("Static gesture event:", static_gesture_event)
+                print("Static dispatch enabled:", enable_static_events)
 
             # ------------------------------------------------
             # G. Sprint 2 evaluation sample recording
