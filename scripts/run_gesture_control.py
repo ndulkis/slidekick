@@ -30,7 +30,14 @@ def make_key_handler(session: SessionCoordinator):
 
 def main():
     adapter = KeyboardPresentationAdapter()
-    controller = GestureCommandController(adapter=adapter)
+    controller = GestureCommandController(
+        adapter=adapter,
+        gesture_bindings={
+            "swipe_right": "next",
+            "swipe_left": "previous",
+            "pinch": "end",
+        },
+    )
     session = SessionCoordinator(gestures=controller)
 
     session.start()
@@ -39,6 +46,7 @@ def main():
     run_camera(
         session.handle_event,
         key_handler=make_key_handler(session),
+        enable_static_events=True,
     )
 
 

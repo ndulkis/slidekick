@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.presentation_adapter import PresentationAdapter
 
@@ -92,3 +94,27 @@ def test_unknown_gesture_does_not_trigger_command():
 
     assert result is False
     assert adapter.calls == []
+
+
+def test_custom_pinch_binding():
+    adapter = Mock()
+    adapter.pause_presentation.return_value = True
+
+    controller = GestureCommandController(
+        adapter=adapter,
+        gesture_bindings={
+            "swipe_right": "next",
+            "swipe_left": "previous",
+            "pinch": "pause",
+        },
+    )
+
+    event = {
+        "event_type": "gesture",
+        "gesture": "pinch",
+        "confidence": 0.90,
+        "timestamp": 1.0,
+    }
+
+    assert controller.handle_event(event) is True
+    adapter.pause_presentation.assert_called_once()
