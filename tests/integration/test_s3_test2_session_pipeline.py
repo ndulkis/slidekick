@@ -2,6 +2,7 @@
 
 import pytest
 
+from slidekick.command_policy import InvalidGestureBindingError
 from slidekick.contracts import SessionState
 from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.session_controller import InvalidTransitionError
@@ -95,15 +96,19 @@ def test_session_pause_resume_and_end_never_invoke_slideshow_shortcuts():
     assert adapter.calls == []  # no B or ESC injected by lifecycle controls
 
 
-def test_custom_mapping_routes_through_coordinator_and_rejects_unknown_command():
-    session, adapter = make_system(
-        {"swipe_right": "previous", "swipe_left": "arbitrary_hotkey"}
-    )
+def test_custom_mapping_routes_through_coordinator():
+    session, adapter = make_system({"swipe_right": "previous", "swipe_left": "next"})
     session.start()
     assert session.handle_event(gesture("swipe_right")) is True
-    with pytest.raises(PresentationCommandError, match="not executed"):
-        session.handle_event(gesture("swipe_left"))
-    assert adapter.calls == ["previous"]
+    assert session.handle_event(gesture("swipe_left")) is True
+    assert adapter.calls == ["previous", "next"]
+
+
+def test_custom_mapping_with_unknown_command_is_rejected_before_use():
+    # Sprint 4 Control 01: this used to load and fail at dispatch. It is now
+    # refused when the mapping is loaded, so no adapter call can ever be attempted.
+    with pytest.raises(InvalidGestureBindingError, match="arbitrary_hotkey"):
+        make_system({"swipe_right": "previous", "swipe_left": "arbitrary_hotkey"})
 
 
 def test_adapter_failure_surfaces_and_next_gesture_recovers():
