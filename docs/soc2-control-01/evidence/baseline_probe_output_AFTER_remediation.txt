@@ -1,0 +1,11 @@
+G-probe  baseline on original code
+bind swipe_right -> end, RUNNING session                   outcome='raised InvalidGestureBindingError' presses=[]
+load binding swipe_right -> 'ctrl+w'                       outcome='raised InvalidGestureBindingError' presses=[]
+load binding swipe_right -> ['next']                       outcome='raised InvalidGestureBindingError' presses=[]
+dispatch binding swipe_right -> ['next']                   outcome='raised InvalidGestureBindingError' presses=[]
+load binding with non-string gesture id 123                outcome='raised InvalidGestureBindingError' presses=[]
+mutate gesture_bindings after construction                 outcome='raised TypeError'           presses=[]
+Simulating: RIGHT arrow (Next Slide)
+controller used directly while session IDLE                outcome=True                         presses=[call('right')]
+adapter execute_command('end')                             outcome='error'                      presses=[]
+adapter execute_command('ctrl+alt+delete')                 outcome='error'                      presses=[]
