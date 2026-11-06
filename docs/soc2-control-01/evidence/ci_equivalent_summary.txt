@@ -1,0 +1,5 @@
+unit: 206 passed in 0.30s
+recognition: 29 passed in 0.70s
+integration: 27 passed in 0.84s
+performance: 5 passed, 1 skipped, 1 xfailed in 1.35s
+smoke: 1 passed in 0.01s
