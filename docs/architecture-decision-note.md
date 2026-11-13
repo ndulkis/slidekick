@@ -71,3 +71,7 @@ Deferred:
 - Integrated PR has a named reviewer.
 - Unit tests cover valid and invalid recognition events, gesture mapping, and the no-op gesture.
 - README contains reproducible setup and verification commands.
+
+## Sprint 4 update: profiles and the session layer
+
+The boundary above has grown two layers. `SessionCoordinator` now sits between recognition and the controller, so the controller and the session are connected. Gesture bindings now come from a validated profile instead of a fixed table. The flow, the checks at each layer and the failure behavior are in [Gesture Profile Architecture](gesture-profile-architecture.md). The contracts between the layers and the owner of each are in [Interface Contracts](sprint4/S4-R01-T1-Interface-Contracts.md).
