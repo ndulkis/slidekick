@@ -1,8 +1,8 @@
 """Unit tests for the Sprint 5 JPEG-based gesture enrollment backend."""
 
-import os
 import json
-import base64
+import os
+
 from slidekick.gesture_enrollment import EnrollmentSession
 
 # A tiny, valid base64 1x1 pixel JPEG for testing
