@@ -59,7 +59,16 @@ def test_quit_while_idle_exits_without_opening_the_camera():
     assert backend.camera == "off"
 
 
-def test_dashboard_opens_in_an_app_window_when_chrome_is_available(monkeypatch):
+def test_dashboard_opens_in_an_app_window_when_chrome_is_available(
+    monkeypatch, tmp_path
+):
+    # A stand-in checkout with the frontend installed, so the test does not
+    # depend on `npm ci` having run (the Python CI job never runs it).
+    vite = tmp_path / "frontend/node_modules/vite/bin/vite.js"
+    vite.parent.mkdir(parents=True)
+    vite.touch()
+    monkeypatch.setattr(runner, "REPO_ROOT", tmp_path)
+
     launched = []
     monkeypatch.setattr(
         runner.subprocess, "Popen", lambda cmd, **kw: launched.append(cmd)
@@ -82,3 +91,9 @@ def test_dashboard_opens_in_an_app_window_when_chrome_is_available(monkeypatch):
     monkeypatch.setattr(runner, "find_app_browser", lambda: None)
     assert len(runner.start_dashboard("/tmp/profile")) == 1
     assert launched[0][-2:] == ["--open", "/session"]
+
+
+def test_dashboard_is_skipped_when_the_frontend_is_not_installed(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(runner.subprocess, "Popen", Mock(side_effect=AssertionError))
+    assert runner.start_dashboard("/tmp/profile") == []
