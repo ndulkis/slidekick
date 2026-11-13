@@ -80,6 +80,7 @@ def run_one_session(backend: Backend) -> None:
             get_calibration=lambda: backend.calibration,
             on_ready=backend.camera_ready,
             should_stop=backend.should_stop_camera,
+            on_frame=backend.set_frame,
         )
     finally:
         backend.camera_stopped()

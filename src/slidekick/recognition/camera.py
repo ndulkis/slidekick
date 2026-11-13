@@ -427,6 +427,7 @@ def run_camera(
     get_calibration=None,
     on_ready=None,
     should_stop=None,
+    on_frame=None,
 ):
     """Run the SlideKick camera and gesture recognition loop.
 
@@ -447,6 +448,12 @@ def run_camera(
         on_ready:
             Optional callback run once the camera and recognizer are up.
 
+        on_frame:
+            Optional callback receiving each processed frame as JPEG
+            bytes. When given, the frames go there instead of to a
+            camera window, so no window is opened and the window keys
+            (Q, Space) are not available.
+
         should_stop:
             Optional callable checked every frame. The loop exits and
             releases the camera when it returns True.
@@ -455,7 +462,7 @@ def run_camera(
     # --------------------------------------------------------
     # A. Initialize camera window and capture device
     # --------------------------------------------------------
-    window_name = create_camera_window()
+    window_name = create_camera_window() if on_frame is None else None
 
     # Camera index 0 selects the computer's default webcam.
     camera = cv2.VideoCapture(0)
@@ -525,7 +532,8 @@ def run_camera(
     if not camera.isOpened():
         print("Error: Could not open camera.")
         camera.release()
-        close_camera_windows()
+        if window_name is not None:
+            close_camera_windows()
         return
 
     # --------------------------------------------------------
@@ -702,6 +710,17 @@ def run_camera(
                 last_gesture_confidence,
             )
 
+            if on_frame is not None:
+                # Send the processed frame to the dashboard preview.
+                # camera.read() paces the loop, so no waitKey is needed.
+                preview = cv2.resize(frame, (WINDOW_WIDTH, WINDOW_HEIGHT))
+                encoded, jpeg = cv2.imencode(
+                    ".jpg", preview, [cv2.IMWRITE_JPEG_QUALITY, 75]
+                )
+                if encoded:
+                    on_frame(jpeg.tobytes())
+                continue
+
             # Display the processed frame in the camera window.
             cv2.imshow(window_name, frame)
 
@@ -757,7 +776,8 @@ def run_camera(
     camera.release()
 
     # Close all OpenCV windows created by the application.
-    close_camera_windows()
+    if window_name is not None:
+        close_camera_windows()
 
 
 # ============================================================

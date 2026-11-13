@@ -13,7 +13,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 from .contracts import SessionState
 from .recognition.swipe_recognizer import GestureCalibration
@@ -90,6 +90,10 @@ class Backend:
         # or starting -> error if the camera never opens.
         self.camera = "off"
         self._started = threading.Event()
+        # Latest camera frame (JPEG) for the dashboard preview.
+        self._frame: bytes | None = None
+        self._frame_id = 0
+        self._frame_ready = threading.Condition()
         self.last_gesture: dict[str, Any] | None = None
         self._gesture_id = 0
         self._lock = threading.Lock()
@@ -154,6 +158,29 @@ class Backend:
     def camera_ready(self) -> None:
         self.camera = "ready"
 
+    def set_frame(self, jpeg: bytes) -> None:
+        with self._frame_ready:
+            self._frame = jpeg
+            self._frame_id += 1
+            self._frame_ready.notify_all()
+
+    def frames(self, timeout: float = 2.0):
+        """Yield each new camera frame. Ends when no frame arrives within
+        timeout seconds, which is how a stream ends after the camera stops.
+        """
+        last = -1
+        while True:
+            with self._frame_ready:
+                if not self._frame_ready.wait_for(
+                    lambda last=last: (
+                        self._frame is not None and self._frame_id != last
+                    ),
+                    timeout,
+                ):
+                    return
+                last, frame = self._frame_id, self._frame
+            yield frame
+
     def camera_stopped(self) -> None:
         """The camera loop exited: the session ended, the camera window was
         closed, or the camera never opened.
@@ -161,6 +188,8 @@ class Backend:
         with self._lock:
             self._started.clear()
             self.camera = "off" if self.camera == "ready" else "error"
+            with self._frame_ready:
+                self._frame = None
             # Without a camera there is no session. Paused cannot end directly
             # (docs/session-state-model.md), so resume first.
             if self.state is SessionState.PAUSED:
@@ -222,6 +251,21 @@ def create_app(backend: Backend) -> Flask:
                 "use_case": event.use_case,
             },
             **backend.status(),
+        )
+
+    @app.get("/api/camera")
+    def camera_stream():
+        """Live preview as MJPEG, which an <img> tag plays without any JS."""
+
+        def parts():
+            for frame in backend.frames():
+                yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"
+
+        return Response(
+            parts(),
+            mimetype="multipart/x-mixed-replace; boundary=frame",
+            # Other sites must not embed the user's camera.
+            headers={"Cross-Origin-Resource-Policy": "same-origin"},
         )
 
     @app.get("/api/calibration")

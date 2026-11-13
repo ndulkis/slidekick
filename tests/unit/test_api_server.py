@@ -166,3 +166,23 @@ def test_camera_failure_or_closed_window_ends_the_session(tmp_path):
     backend.camera_stopped()
     assert backend.camera == "off"
     assert backend.state.value == "ended"
+
+
+def test_camera_stream_serves_frames_and_ends_when_the_camera_stops(tmp_path):
+    client, backend, _ = make_client(tmp_path)
+    backend.set_frame(b"JPEG1")
+
+    res = client.get("/api/camera")
+    assert res.mimetype == "multipart/x-mixed-replace"
+    assert res.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+
+    frames = backend.frames(timeout=0.05)
+    assert next(frames) == b"JPEG1"
+    backend.set_frame(b"JPEG2")
+    assert next(frames) == b"JPEG2"
+    # No new frame: the stream ends instead of repeating the old one.
+    assert list(frames) == []
+
+    # A stopped camera leaves no stale frame for the next session's stream.
+    backend.camera_stopped()
+    assert list(backend.frames(timeout=0.05)) == []

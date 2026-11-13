@@ -33,18 +33,23 @@ describe('CameraPreview', () => {
     expect(status).toHaveClass('camera-preview', 'camera-preview-ready')
   })
 
-  it('shows the preview when active', () => {
+  it('shows the live camera stream when active', () => {
     render(<CameraPreview status="active" hasCamera={true} />)
-    const status = screen.getByRole('status')
-    expect(status).toHaveTextContent('Camera preview')
-    expect(status).toHaveClass('camera-preview', 'camera-preview-active')
+    const video = screen.getByRole('img', { name: 'Camera preview' })
+    expect(video).toHaveAttribute('src', '/api/camera')
+    expect(video.parentElement).toHaveClass('camera-preview', 'camera-preview-active')
   })
 
-  it('shows the paused label when paused', () => {
+  it('keeps the live stream, labelled as paused, when paused', () => {
     render(<CameraPreview status="paused" hasCamera={true} />)
-    const status = screen.getByRole('status')
-    expect(status).toHaveTextContent('Camera preview (paused)')
-    expect(status).toHaveClass('camera-preview', 'camera-preview-paused')
+    const video = screen.getByRole('img', { name: 'Camera preview (paused)' })
+    expect(video).toHaveAttribute('src', '/api/camera')
+    expect(video.parentElement).toHaveClass('camera-preview', 'camera-preview-paused')
+  })
+
+  it('does not request the stream while the camera is off', () => {
+    render(<CameraPreview status="ended" hasCamera={true} />)
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 
   it('shows camera off when the session has ended', () => {

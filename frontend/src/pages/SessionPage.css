@@ -26,6 +26,20 @@
   text-align: center;
 }
 
+.camera-preview-live {
+  padding: 0;
+  overflow: hidden;
+  /* Same shape as the stream, so the page doesn't jump when it loads. */
+  aspect-ratio: 16 / 9;
+}
+
+.camera-preview-live img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .camera-preview-error {
   border-color: #b00020;
 }
