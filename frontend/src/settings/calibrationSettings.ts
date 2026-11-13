@@ -1,12 +1,13 @@
+import { api } from '../core/api'
+
 // Gesture calibration settings shown on the Settings page.
 //
 // Defaults match the backend GestureCalibration class in
 // src/slidekick/recognition/swipe_recognizer.py. Ranges are kept inside what
 // that class's validation accepts; confirm them with R03 before release.
 //
-// These settings are saved in the browser only. The frontend isn't connected
-// to the recognition backend yet, so saving them doesn't change how gestures
-// are recognized.
+// Settings are loaded from and saved to the running SlideKick app, which
+// applies them to recognition right away and keeps them in data/calibration.json.
 
 export type CalibrationKey = 'swipeDistance' | 'swipeDuration' | 'strictness' | 'cooldown'
 
@@ -30,7 +31,8 @@ export const CALIBRATION_CONTROLS: CalibrationControl[] = [
     label: 'Swipe distance',
     description: 'How far your hand must move, as a share of the camera width.',
     min: 0.05,
-    max: 0.2,
+    // Must stay below ideal_displacement (0.20) or the backend rejects it.
+    max: 0.19,
     step: 0.01,
     unit: '%',
     backendField: 'min_displacement',
@@ -74,19 +76,6 @@ export const DEFAULT_CALIBRATION: CalibrationSettings = {
   cooldown: 1.5,
 }
 
-export const CALIBRATION_STORAGE_KEY = 'slidekick.calibrationProfile'
-
-export type CalibrationStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
-
-function browserStorage(): CalibrationStorage | undefined {
-  // Accessing localStorage can throw when site data is blocked.
-  try {
-    return window.localStorage
-  } catch {
-    return undefined
-  }
-}
-
 export function isValidCalibration(value: unknown): value is CalibrationSettings {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
@@ -96,47 +85,39 @@ export function isValidCalibration(value: unknown): value is CalibrationSettings
   })
 }
 
-/** Returns the saved profile, or the defaults if none is saved or it's invalid. */
-export function loadCalibration(storage = browserStorage()): CalibrationSettings {
-  try {
-    const raw = storage?.getItem(CALIBRATION_STORAGE_KEY)
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw)
-      if (isValidCalibration(parsed)) {
-        return {
-          swipeDistance: parsed.swipeDistance,
-          swipeDuration: parsed.swipeDuration,
-          strictness: parsed.strictness,
-          cooldown: parsed.cooldown,
-        }
-      }
-    }
-  } catch {
-    // Unreadable or corrupt data falls through to the defaults.
-  }
-  return { ...DEFAULT_CALIBRATION }
+/** Converts to the GestureCalibration field names the API uses. */
+export function toBackend(settings: CalibrationSettings): Record<string, number> {
+  return Object.fromEntries(
+    CALIBRATION_CONTROLS.map(({ key, backendField }) => [backendField, settings[key]]),
+  )
 }
 
-/** Saves the profile. Returns false if it's invalid or couldn't be stored. */
-export function saveCalibration(
-  settings: CalibrationSettings,
-  storage = browserStorage(),
-): boolean {
-  if (!storage || !isValidCalibration(settings)) return false
+/** Converts from the API's field names; undefined if any value is missing or out of range. */
+export function fromBackend(body: unknown): CalibrationSettings | undefined {
+  if (typeof body !== 'object' || body === null) return undefined
+  const record = body as Record<string, unknown>
+  const settings = Object.fromEntries(
+    CALIBRATION_CONTROLS.map(({ key, backendField }) => [key, record[backendField]]),
+  )
+  return isValidCalibration(settings) ? settings : undefined
+}
+
+/** The calibration SlideKick is using, or undefined if it can't be reached. */
+export async function fetchCalibration(): Promise<CalibrationSettings | undefined> {
   try {
-    storage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify(settings))
-    return true
+    const res = await api<unknown>('/calibration')
+    return res.ok ? fromBackend(res.body) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Applies and saves the calibration. Returns false if it was refused or SlideKick can't be reached. */
+export async function saveCalibration(settings: CalibrationSettings): Promise<boolean> {
+  if (!isValidCalibration(settings)) return false
+  try {
+    return (await api('/calibration', 'PUT', toBackend(settings))).ok
   } catch {
     return false
   }
-}
-
-/** Removes the saved profile and returns the defaults. */
-export function resetCalibration(storage = browserStorage()): CalibrationSettings {
-  try {
-    storage?.removeItem(CALIBRATION_STORAGE_KEY)
-  } catch {
-    // Nothing saved to remove; the defaults apply either way.
-  }
-  return { ...DEFAULT_CALIBRATION }
 }

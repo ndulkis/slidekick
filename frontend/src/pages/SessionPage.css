@@ -68,18 +68,3 @@ button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-
-.session-demo-controls {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-  text-align: left;
-}
-
-.session-demo-controls fieldset {
-  margin-bottom: 12px;
-}
-
-.session-demo-controls button {
-  margin: 4px;
-}
