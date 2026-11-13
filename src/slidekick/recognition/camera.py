@@ -412,6 +412,8 @@ def run_camera(
     calibration: GestureCalibration | None = None,
     key_handler=None,
     enable_static_events=False,
+    get_calibration=None,
+    on_ready=None,
 ):
     """Run the SlideKick camera and gesture recognition loop.
 
@@ -423,6 +425,14 @@ def run_camera(
         calibration:
             Optional custom recognition settings. If omitted,
             SlideKick uses its tested default thresholds.
+
+        get_calibration:
+            Optional callable returning the current calibration. It is
+            read every frame, so changes apply while the camera runs.
+            Takes priority over calibration.
+
+        on_ready:
+            Optional callback run once the camera and recognizer are up.
     """
 
     # --------------------------------------------------------
@@ -514,6 +524,9 @@ def run_camera(
         last_gesture_name = "none"
         last_gesture_confidence = 0.0
 
+        if on_ready is not None:
+            on_ready()
+
         # ----------------------------------------------------
         # F. Main frame-processing loop
         # ----------------------------------------------------
@@ -564,7 +577,7 @@ def run_camera(
                 position_history,
                 gesture_state,
                 missed_hand_frames,
-                calibration=calibration,
+                calibration=get_calibration() if get_calibration else calibration,
             )
 
             # Extract static classification from the same MediaPipe result.
