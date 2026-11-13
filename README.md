@@ -48,14 +48,14 @@ Run from the repo root with `.venv` active. On Windows, set `$env:PYTHONPATH = "
 
 | Command | What it does |
 | --- | --- |
-| `PYTHONPATH=src python scripts/run_gesture_control.py` | Run SlideKick: webcam gestures control the focused presentation |
+| `PYTHONPATH=src python scripts/run_gesture_control.py` | Run SlideKick: webcam gestures control the focused presentation, and the dashboard opens at `localhost:5173/session` (API on `127.0.0.1:5001`) |
 | `PYTHONPATH=src python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
 | `PYTHONPATH=src python scripts/check_env.py` | Check the dev environment and print fixes |
 | `./scripts/verify.sh` | Run the environment check plus the main CI checks |
 | `./scripts/checks/<name>.sh` | Run one CI check on its own, e.g. `./scripts/checks/unit-tests.sh` (see `scripts/checks/` for the list) |
 | `python -m pytest` | Run all Python tests |
 | `ruff check .` / `ruff format .` | Lint / format Python |
-| `npm --prefix frontend run dev` | Dashboard dev server on port 5173 |
+| `npm --prefix frontend run dev` | Dashboard dev server only, without the backend (it shows "Can't reach SlideKick") |
 | `npm --prefix frontend run test` / `run lint` | Frontend tests / lint |
 | `python manual_test.py` | Press "next slide" once after 3 seconds, to check slide control |
 
