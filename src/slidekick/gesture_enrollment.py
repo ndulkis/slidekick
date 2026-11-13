@@ -1,82 +1,127 @@
-"""Gesture enrollment backend prototype for sample collection and storage."""
-
-import json
 import os
-from datetime import UTC, datetime
-from uuid import uuid4
-
+import json
+import base64
+import time
+from datetime import datetime, timezone
 
 class EnrollmentSession:
-    def __init__(self, gesture_name: str, target_samples: int = 10):
-        """Initialize a new gesture enrollment session."""
-        self.session_id = str(uuid4())
+    """
+    Manages the guided gesture data collection session to satisfy the 
+    Sprint 5 R03 <-> R04 Data Training Contract.
+    """
+    # The 8 specific stages required by Diego's training pipeline
+    STAGES = [
+        "neutral", 
+        "slight left tilt", 
+        "slight right tilt", 
+        "closer", 
+        "farther", 
+        "reposition", 
+        "reform", 
+        "final confirmation"
+    ]
+    
+    def __init__(self, profile_id, enrollment_id, gesture_name):
+        self.profile_id = profile_id
+        self.enrollment_id = enrollment_id
         self.gesture_name = gesture_name
-        self.target_samples = target_samples
+        self.status = "collecting"
         self.samples = []
-        self.status = (
-            "collecting"  # States: collecting, validating, completed, cancelled
-        )
-        self.created_at = datetime.now(UTC).isoformat()
+        self.target_per_stage = 8
+        self.current_stage_index = 0
 
-    def add_sample(self, landmarks: list) -> dict:
-        """Add a landmark sample to the current session."""
+    def add_sample(self, base64_image, guided_stage_id, capture_group_id, output_dir):
+        """
+        Receives a webcam frame, decodes it, saves as a JPEG, and logs it.
+        """
         if self.status != "collecting":
-            return {"error": f"Cannot add sample. Session is {self.status}."}
-
-        if not landmarks or len(landmarks) == 0:
-            return {"error": "Invalid sample data."}
-
-        self.samples.append(
-            {"timestamp": datetime.now(UTC).isoformat(), "landmarks": landmarks}
-        )
-
-        if len(self.samples) >= self.target_samples:
-            self.status = "validating"
+            return {"error": "Session is not in collecting state."}
+            
+        if guided_stage_id not in self.STAGES:
+            return {"error": f"Invalid stage: {guided_stage_id}"}
+            
+        # Ensure the image output directory exists
+        gesture_dir = os.path.join(output_dir, "images", self.gesture_name)
+        os.makedirs(gesture_dir, exist_ok=True)
+        
+        # Generate a unique sample ID and file path
+        timestamp = int(time.time() * 1000)
+        sample_id = f"{self.gesture_name}_{capture_group_id}_{timestamp}"
+        filepath = os.path.join(gesture_dir, f"{sample_id}.jpg")
+        
+        # Decode the base64 image from the frontend and save as JPEG
+        try:
+            if "," in base64_image:
+                base64_image = base64_image.split(",")[1]
+            image_bytes = base64.b64decode(base64_image)
+            with open(filepath, "wb") as img_file:
+                img_file.write(image_bytes)
+        except Exception as e:
+            return {"error": "Failed to save image", "details": str(e)}
+            
+        # Log the required capture metadata for the manifest
+        sample_record = {
+            "sample_id": sample_id,
+            "gesture_id": self.gesture_name,
+            "image_ref": filepath,
+            "capture_group_id": capture_group_id,
+            "guided_stage_id": guided_stage_id,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "mirrored": True
+        }
+        self.samples.append(sample_record)
+        
+        # Check if we hit the ~8 image target for the current stage
+        stage_samples = [s for s in self.samples if s["guided_stage_id"] == guided_stage_id]
+        if len(stage_samples) >= self.target_per_stage:
+            self.current_stage_index += 1
+            if self.current_stage_index >= len(self.STAGES):
+                self.status = "validating"
 
         return {
-            "status": "success",
-            "current_count": len(self.samples),
-            "target": self.target_samples,
-            "session_status": self.status,
+            "status": "success", 
+            "sample_id": sample_id,
+            "current_stage": guided_stage_id,
+            "stage_count": len(stage_samples)
         }
-
-    def complete_session(self, storage_dir: str = "dataset") -> dict:
-        """Save the collected dataset to local storage for R03's training pipeline."""
-        if self.status not in ["validating", "collecting"]:
-            return {"error": f"Session cannot be completed from {self.status} state."}
-
-        if len(self.samples) == 0:
-            self.status = "cancelled"
-            return {"error": "No samples collected. Session cancelled."}
-
+        
+    def complete_session(self, storage_dir):
+        """
+        Finalizes the session and exports the versioned dataset manifest JSON.
+        """
+        if self.status not in ["collecting", "validating"]:
+            return {"error": "Cannot complete session in current state."}
+            
         self.status = "completed"
         os.makedirs(storage_dir, exist_ok=True)
-
-        filename = f"{self.gesture_name}_{self.session_id[:8]}.json"
-        filepath = os.path.join(storage_dir, filename)
-
-        dataset = {
-            "session_id": self.session_id,
-            "gesture_name": self.gesture_name,
-            "sample_count": len(self.samples),
-            "created_at": self.created_at,
-            "samples": self.samples,
+        
+        # Build the exact manifest structure Diego's pipeline expects
+        manifest = {
+            "schema_version": "1.0",
+            "dataset_version": "1.0",
+            "profile_id": self.profile_id,
+            "enrollment_id": self.enrollment_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "class_manifest": {
+                "gesture_id": self.gesture_name,
+                "class_label": self.gesture_name,
+                "display_name": self.gesture_name.replace("_", " ").title(),
+                "sample_ids": [s["sample_id"] for s in self.samples]
+            },
+            "samples": self.samples
         }
-
-        with open(filepath, "w") as f:
-            json.dump(dataset, f, indent=4)
-
+        
+        manifest_path = os.path.join(storage_dir, f"{self.enrollment_id}_manifest.json")
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=4)
+            
         return {
             "status": "success",
-            "file": filepath,
-            "samples_saved": len(self.samples),
+            "manifest_file": manifest_path,
+            "total_images_saved": len(self.samples)
         }
 
-    def cancel_session(self) -> dict:
-        """Cancel the current session and discard all collected samples."""
+    def cancel_session(self):
         self.status = "cancelled"
-        self.samples = []
-        return {
-            "status": "cancelled",
-            "message": "Session aborted and samples cleared.",
-        }
+        self.samples.clear()
+        return {"status": "cancelled"}
