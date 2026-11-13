@@ -4,7 +4,7 @@ dashboard itself, started together.
 
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 
 from .api_server import API_PORT, Backend, serve_in_background
@@ -31,7 +31,9 @@ def start_dashboard() -> subprocess.Popen | None:
         print("Dashboard not started: run `npm --prefix frontend ci` first.")
         return None
     print(f"Dashboard: http://localhost:{DASHBOARD_PORT}/session")
-    return subprocess.Popen(
+    # Bandit is silenced here and on the import: fixed argument list, no
+    # shell, no user input. It only starts the Vite dev server.
+    return subprocess.Popen(  # nosec B603
         [
             node,
             str(vite),
