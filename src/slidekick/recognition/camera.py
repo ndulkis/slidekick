@@ -364,6 +364,18 @@ def process_hand_detection(
 # ============================================================
 
 
+def close_camera_windows():
+    """Close the preview window and wait until it is really gone."""
+
+    cv2.destroyAllWindows()
+
+    # On macOS the window only disappears once the GUI event loop runs again,
+    # and this process may now sit idle until the next session. Measured:
+    # 5 x 1 ms is not enough, 30 x 10 ms is.
+    for _ in range(30):
+        cv2.waitKey(10)
+
+
 def should_close_window(window_name, key):
     """Check whether the user requested to close the camera."""
 
@@ -513,7 +525,7 @@ def run_camera(
     if not camera.isOpened():
         print("Error: Could not open camera.")
         camera.release()
-        cv2.destroyAllWindows()
+        close_camera_windows()
         return
 
     # --------------------------------------------------------
@@ -745,7 +757,7 @@ def run_camera(
     camera.release()
 
     # Close all OpenCV windows created by the application.
-    cv2.destroyAllWindows()
+    close_camera_windows()
 
 
 # ============================================================
