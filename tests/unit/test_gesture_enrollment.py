@@ -1,66 +1,91 @@
-import json
-import os
+"""Unit tests for the Sprint 5 JPEG-based gesture enrollment backend."""
 
+import os
+import json
+import base64
 from slidekick.gesture_enrollment import EnrollmentSession
 
+# A tiny, valid base64 1x1 pixel JPEG for testing
+DUMMY_BASE64_JPEG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 
 def test_enrollment_session_creation():
     """Verify session initializes with correct default states."""
-    session = EnrollmentSession(gesture_name="swipe_right", target_samples=5)
-    assert session.gesture_name == "swipe_right"
-    assert session.target_samples == 5
+    session = EnrollmentSession(profile_id="prof_123", enrollment_id="enr_456", gesture_name="peace_sign")
     assert session.status == "collecting"
+    assert session.gesture_name == "peace_sign"
     assert len(session.samples) == 0
 
+def test_add_valid_sample(tmp_path):
+    """Verify adding a sample saves the image and logs metadata."""
+    session = EnrollmentSession(profile_id="prof_123", enrollment_id="enr_456", gesture_name="peace_sign")
+    
+    result = session.add_sample(
+        base64_image=DUMMY_BASE64_JPEG,
+        guided_stage_id="neutral",
+        capture_group_id="take_1",
+        output_dir=str(tmp_path)
+    )
+    
+    assert result["status"] == "success"
+    assert result["current_stage"] == "neutral"
+    assert len(session.samples) == 1
+    
+    # Verify the file was actually saved
+    filepath = session.samples[0]["image_ref"]
+    assert os.path.exists(filepath)
 
-def test_add_valid_sample():
-    """Verify adding samples increments the count and triggers validation state."""
-    session = EnrollmentSession(gesture_name="peace_sign", target_samples=2)
-    response = session.add_sample([{"x": 0.1, "y": 0.2}, {"x": 0.3, "y": 0.4}])
-
-    assert response["status"] == "success"
-    assert response["current_count"] == 1
-    assert session.status == "collecting"
-
-    # Add second sample to hit the target
-    response2 = session.add_sample([{"x": 0.5, "y": 0.6}])
-    assert response2["current_count"] == 2
-    assert session.status == "validating"
-
-
-def test_add_invalid_sample():
-    """Verify empty or invalid samples are rejected."""
-    session = EnrollmentSession(gesture_name="fist")
-    response = session.add_sample([])
-    assert "error" in response
-
+def test_add_invalid_stage(tmp_path):
+    """Verify that an unsupported stage is rejected."""
+    session = EnrollmentSession(profile_id="prof_123", enrollment_id="enr_456", gesture_name="peace_sign")
+    
+    result = session.add_sample(
+        base64_image=DUMMY_BASE64_JPEG,
+        guided_stage_id="unsupported_stage",
+        capture_group_id="take_1",
+        output_dir=str(tmp_path)
+    )
+    
+    assert "error" in result
+    assert "Invalid stage" in result["error"]
+    assert len(session.samples) == 0
 
 def test_cancel_session():
     """Verify cancellation clears samples and updates status."""
-    session = EnrollmentSession(gesture_name="thumbs_up")
-    session.add_sample([{"x": 0.1, "y": 0.2}])
-    response = session.cancel_session()
-
-    assert response["status"] == "cancelled"
+    session = EnrollmentSession(profile_id="prof_123", enrollment_id="enr_456", gesture_name="thumbs_up")
+    session.samples = [{"dummy": "data"}]  # Inject fake data
+    
+    result = session.cancel_session()
+    
+    assert result["status"] == "cancelled"
     assert session.status == "cancelled"
     assert len(session.samples) == 0
 
-
 def test_complete_session(tmp_path):
-    """Verify completing a session saves a formatted JSON dataset."""
-    # tmp_path is a built-in pytest fixture that creates a safe temporary directory for testing
-    session = EnrollmentSession(gesture_name="swipe_left", target_samples=1)
-    session.add_sample([{"x": 0.5, "y": 0.5}])
-
-    storage_dir = str(tmp_path / "dataset")
-    response = session.complete_session(storage_dir=storage_dir)
-
-    assert response["status"] == "success"
+    """Verify completing a session exports the correct Dataset Manifest."""
+    session = EnrollmentSession(profile_id="prof_123", enrollment_id="enr_456", gesture_name="peace_sign")
+    
+    # Add a mock sample so it allows completion
+    session.add_sample(
+        base64_image=DUMMY_BASE64_JPEG,
+        guided_stage_id="neutral",
+        capture_group_id="take_1",
+        output_dir=str(tmp_path)
+    )
+    
+    # We must mock the state since we didn't hit the 64-image target
+    session.status = "validating"
+    
+    result = session.complete_session(storage_dir=str(tmp_path))
+    
+    assert result["status"] == "success"
     assert session.status == "completed"
-
-    # Verify the JSON file was actually created and contains the right gesture name
-    assert os.path.exists(response["file"])
-    with open(response["file"], "r") as f:
-        data = json.load(f)
-        assert data["gesture_name"] == "swipe_left"
-        assert data["sample_count"] == 1
+    
+    # Verify the manifest JSON file exists and contains the right keys
+    manifest_path = result["manifest_file"]
+    assert os.path.exists(manifest_path)
+    
+    with open(manifest_path, "r") as f:
+        manifest = json.load(f)
+        assert manifest["profile_id"] == "prof_123"
+        assert manifest["class_manifest"]["gesture_id"] == "peace_sign"
+        assert len(manifest["samples"]) == 1
