@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "name": "default",
+  "bindings": {
+    "swipe_right": "next",
+    "swipe_left": "previous"
+  }
+}
