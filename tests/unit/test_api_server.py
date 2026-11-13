@@ -51,7 +51,7 @@ def test_session_lifecycle_and_gestures(tmp_path):
     client, backend, adapter = make_client(tmp_path)
     assert client.get("/api/session").json == {
         "state": "idle",
-        "camera": "starting",
+        "camera": "off",
         "last_gesture": None,
         "presentation_error": None,
     }
@@ -128,3 +128,41 @@ def test_calibration_validation(tmp_path):
         assert client.put("/api/calibration", json=body).status_code == 400, body
     assert backend.calibration.min_displacement == 0.10
     assert not (tmp_path / "calibration.json").exists()
+
+
+def test_camera_follows_the_session(tmp_path):
+    client, backend, _ = make_client(tmp_path)
+    assert not backend._started.is_set()
+
+    # Starting a session asks for the camera.
+    post(client, "/api/session/start")
+    assert backend._started.is_set()
+    assert backend.camera == "starting"
+    assert not backend.should_stop_camera()
+    backend.camera_ready()
+
+    # Ending it stops the camera loop, which reports back.
+    post(client, "/api/session/end")
+    assert backend.should_stop_camera()
+    backend.camera_stopped()
+    assert backend.camera == "off"
+    assert not backend._started.is_set()
+
+
+def test_camera_failure_or_closed_window_ends_the_session(tmp_path):
+    client, backend, _ = make_client(tmp_path)
+
+    # Camera never became ready.
+    post(client, "/api/session/start")
+    backend.camera_stopped()
+    assert client.get("/api/session").json["camera"] == "error"
+    assert backend.state.value == "ended"
+
+    # Camera window closed while paused. A new start clears the old error.
+    post(client, "/api/session/start")
+    assert backend.camera == "starting"
+    backend.camera_ready()
+    post(client, "/api/session/pause")
+    backend.camera_stopped()
+    assert backend.camera == "off"
+    assert backend.state.value == "ended"

@@ -21,7 +21,7 @@ describe('useSession', () => {
 
     await waitFor(() => expect(result.current.connection).toBe('connected'))
     expect(result.current.state).toBe('paused')
-    expect(result.current.camera).toBe('ready')
+    expect(result.current.camera).toBe('off')
   })
 
   it('returns the event and new state for a valid action', async () => {

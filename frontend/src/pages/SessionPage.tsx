@@ -16,9 +16,10 @@ function SessionPage() {
   const { connection, camera } = session
 
   // Loading and error come from the connection and the camera, not the
-  // session lifecycle.
+  // session lifecycle. A camera that failed to open ends the session, so the
+  // user can try Start again.
   const override =
-    connection === 'offline' || camera === 'error'
+    connection === 'offline'
       ? 'error'
       : connection === 'connecting' || camera === 'starting'
         ? 'loading'
@@ -56,6 +57,13 @@ function SessionPage() {
       )}
       {session.presentationError && (
         <p className="session-message">{session.presentationError}</p>
+      )}
+
+      {camera === 'error' && (
+        <p className="session-message" role="alert">
+          The camera couldn't start. Check camera access for the terminal running SlideKick,
+          then start a new session.
+        </p>
       )}
 
       <CameraPreview status={status} hasCamera={camera !== 'error'} />

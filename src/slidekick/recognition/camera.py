@@ -414,6 +414,7 @@ def run_camera(
     enable_static_events=False,
     get_calibration=None,
     on_ready=None,
+    should_stop=None,
 ):
     """Run the SlideKick camera and gesture recognition loop.
 
@@ -433,6 +434,10 @@ def run_camera(
 
         on_ready:
             Optional callback run once the camera and recognizer are up.
+
+        should_stop:
+            Optional callable checked every frame. The loop exits and
+            releases the camera when it returns True.
     """
 
     # --------------------------------------------------------
@@ -532,6 +537,9 @@ def run_camera(
         # ----------------------------------------------------
 
         while True:
+            if should_stop is not None and should_stop():
+                break
+
             # Read the next camera frame.
             success, frame = camera.read()
 

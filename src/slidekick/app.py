@@ -5,38 +5,12 @@ dashboard itself, started together.
 import os
 import shutil
 import subprocess
-import threading
 from pathlib import Path
 
 from .api_server import API_PORT, Backend, serve_in_background
 from .gesture_command_controller import GestureCommandController
 from .recognition.camera import run_camera
-from .session_controller import InvalidTransitionError
 from .session_coordinator import SessionCoordinator
-
-
-def make_key_handler(session: SessionCoordinator):
-    actions = {
-        ord("s"): session.start,
-        ord("p"): session.pause,
-        ord("r"): session.resume,
-        ord("e"): session.end,
-    }
-
-    def handle_key(key: int) -> None:
-        action = actions.get(key)
-
-        if action is None:
-            return
-
-        try:
-            action()
-            print(f"Session: {session.state.value}")
-        except InvalidTransitionError as exc:
-            print(f"Invalid session action: {exc}")
-
-    return handle_key
-
 
 # ponytail: assumes an editable install from a checkout (`pip install -e .`);
 # the models, data/ and frontend/ live in the repo, not in the package.
@@ -83,30 +57,29 @@ def main():
     print(f"Dashboard API: http://127.0.0.1:{API_PORT}/api/session")
 
     dashboard = start_dashboard()
+    print("Start a session from the dashboard. Ctrl+C to quit.")
     try:
-        run_session(backend)
+        while True:
+            run_one_session(backend)
+    except KeyboardInterrupt:
+        pass
     finally:
         if dashboard is not None:
             dashboard.terminate()
 
 
-def run_session(backend: Backend) -> None:
-    backend.start()
-    print(f"Session: {backend.state.value}")
-
-    run_camera(
-        backend.handle_event,
-        key_handler=make_key_handler(backend),
-        enable_static_events=True,
-        get_calibration=lambda: backend.calibration,
-        on_ready=backend.camera_ready,
-    )
-
-    if backend.camera != "ready":
-        # Keep the API up so the dashboard can show the camera error.
-        backend.camera = "error"
-        print("Camera did not start. The dashboard shows the error. Ctrl+C to quit.")
-        try:
-            threading.Event().wait()
-        except KeyboardInterrupt:
-            pass
+def run_one_session(backend: Backend) -> None:
+    """Wait for the dashboard to start a session, then run the camera until
+    the session ends. Must run on the main thread (OpenCV on macOS).
+    """
+    backend.wait_for_start()
+    try:
+        run_camera(
+            backend.handle_event,
+            enable_static_events=True,
+            get_calibration=lambda: backend.calibration,
+            on_ready=backend.camera_ready,
+            should_stop=backend.should_stop_camera,
+        )
+    finally:
+        backend.camera_stopped()

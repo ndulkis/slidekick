@@ -1,7 +1,8 @@
-"""Local HTTP API so the React dashboard can drive the running SlideKick session.
+"""Local HTTP API so the React dashboard can drive SlideKick.
 
-The server runs in a background thread next to the camera loop, because OpenCV
-needs the main thread on macOS. It binds to 127.0.0.1 only. The browser reaches
+The dashboard controls everything: starting a session turns the camera on and
+ending it turns the camera off. The server runs in a background thread, because
+OpenCV needs the main thread on macOS. It binds to 127.0.0.1 only. The browser reaches
 it through the Vite dev server's /api proxy (frontend/vite.config.ts).
 """
 
@@ -14,6 +15,7 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
+from .contracts import SessionState
 from .recognition.swipe_recognizer import GestureCalibration
 from .session_controller import InvalidTransitionError
 from .session_coordinator import PresentationCommandError, SessionCoordinator
@@ -74,8 +76,8 @@ def load_calibration(path: Path | None) -> GestureCalibration:
 
 
 class Backend:
-    """Thread-safe facade over the session that the camera loop, the camera
-    window keys, and the HTTP API all share.
+    """Thread-safe facade over the session that the camera loop and the HTTP
+    API share.
     """
 
     def __init__(
@@ -84,8 +86,10 @@ class Backend:
         self.coordinator = coordinator
         self.calibration_path = calibration_path
         self.calibration = load_calibration(calibration_path)
-        # starting -> ready, or starting -> error if the camera never opens.
-        self.camera = "starting"
+        # off -> starting (session started) -> ready -> off (session ended),
+        # or starting -> error if the camera never opens.
+        self.camera = "off"
+        self._started = threading.Event()
         self.last_gesture: dict[str, Any] | None = None
         self._gesture_id = 0
         self._lock = threading.Lock()
@@ -95,7 +99,14 @@ class Backend:
         return self.coordinator.state
 
     def start(self):
-        return self._act(self.coordinator.start)
+        def start():
+            event = self.coordinator.start()
+            if self.camera != "ready":
+                self.camera = "starting"
+            self._started.set()
+            return event
+
+        return self._act(start)
 
     def pause(self):
         return self._act(self.coordinator.pause)
@@ -133,8 +144,30 @@ class Backend:
                 }
             return handled
 
+    def wait_for_start(self) -> None:
+        """Block until a session is started. The camera loop waits here."""
+        self._started.wait()
+
+    def should_stop_camera(self) -> bool:
+        return self.state is SessionState.ENDED
+
     def camera_ready(self) -> None:
         self.camera = "ready"
+
+    def camera_stopped(self) -> None:
+        """The camera loop exited: the session ended, the camera window was
+        closed, or the camera never opened.
+        """
+        with self._lock:
+            self._started.clear()
+            self.camera = "off" if self.camera == "ready" else "error"
+            # Without a camera there is no session. Paused cannot end directly
+            # (docs/session-state-model.md), so resume first.
+            if self.state is SessionState.PAUSED:
+                self.coordinator.resume()
+            if self.state is SessionState.RUNNING:
+                self.coordinator.end()
+            self.last_gesture = None
 
     def set_calibration(self, data: Any) -> GestureCalibration:
         calibration = parse_calibration(data, self.calibration)

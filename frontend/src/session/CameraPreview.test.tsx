@@ -26,10 +26,10 @@ describe('CameraPreview', () => {
     expect(alert).toHaveClass('camera-preview', 'camera-preview-error')
   })
 
-  it('shows the preview when ready', () => {
+  it('shows the camera as off before a session starts', () => {
     render(<CameraPreview status="ready" hasCamera={true} />)
     const status = screen.getByRole('status')
-    expect(status).toHaveTextContent('Camera preview')
+    expect(status).toHaveTextContent('Camera off')
     expect(status).toHaveClass('camera-preview', 'camera-preview-ready')
   })
 

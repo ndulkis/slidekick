@@ -17,7 +17,9 @@ function initial() {
   return {
     online: true,
     state: 'idle' as SessionState,
-    camera: 'ready' as CameraStatus,
+    camera: 'off' as CameraStatus,
+    /** What the camera becomes when a session starts. */
+    cameraOnStart: 'ready' as CameraStatus,
     lastGesture: null as { id: number; gesture: Gesture; confidence: number | null } | null,
     presentationError: null as string | null,
     calibration: toBackend(DEFAULT_CALIBRATION) as Record<string, number>,
@@ -74,6 +76,8 @@ export function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise
     const previous = fakeBackend.state
     fakeBackend.state = t.to
     fakeBackend.lastGesture = null
+    if (action === 'start') fakeBackend.camera = fakeBackend.cameraOnStart
+    if (action === 'end') fakeBackend.camera = 'off'
     return json({
       event: { type: t.type, previous_state: previous, new_state: t.to, use_case: t.use_case },
       ...status(),

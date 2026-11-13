@@ -11,8 +11,8 @@ export const POLL_INTERVAL_MS = 500
 /** connecting until the first reply; offline while SlideKick can't be reached. */
 export type Connection = 'connecting' | 'connected' | 'offline'
 
-/** Whether the Python camera loop has started. */
-export type CameraStatus = 'starting' | 'ready' | 'error'
+/** The camera is off until a session starts. error: it failed to open last time. */
+export type CameraStatus = 'off' | 'starting' | 'ready' | 'error'
 
 /** The last gesture that ran a presentation command. id changes per gesture. */
 export type LastGesture = { id: number; gesture: Gesture; confidence?: number }
@@ -38,7 +38,7 @@ type Action = 'start' | 'pause' | 'resume' | 'end'
 export function useSession() {
   const [connection, setConnection] = useState<Connection>('connecting')
   const [state, setState] = useState<SessionState>('idle')
-  const [camera, setCamera] = useState<CameraStatus>('starting')
+  const [camera, setCamera] = useState<CameraStatus>('off')
   const [presentationError, setPresentationError] = useState<string | null>(null)
   const [lastGesture, setLastGesture] = useState<LastGesture | null>(null)
 

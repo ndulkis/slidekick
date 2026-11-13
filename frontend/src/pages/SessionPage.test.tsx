@@ -40,16 +40,26 @@ describe('SessionPage', () => {
   })
 
   it('shows Session starting while the camera starts', async () => {
-    fakeBackend.camera = 'starting'
-    await renderPage('Session starting')
+    fakeBackend.cameraOnStart = 'starting'
+    await renderPage()
+    await click('Start session', 'Session starting')
     expect(screen.getByText('Starting camera...')).toBeInTheDocument()
+    expect(button('End session')).toBeDisabled()
+
+    fakeBackend.camera = 'ready'
+    await expectBadge('Active')
   })
 
-  it('shows camera unavailable when the camera failed', async () => {
+  it('lets the user retry when the camera failed to start', async () => {
+    // The backend ends the session when the camera can't open.
+    fakeBackend.state = 'ended'
     fakeBackend.camera = 'error'
-    await renderPage('Error')
+    await renderPage('Ended')
+    expect(screen.getByRole('alert')).toHaveTextContent("The camera couldn't start.")
     expect(screen.getByText('No camera source is available.')).toBeInTheDocument()
-    expect(button('Start session')).toBeDisabled()
+
+    await click('Start new session', 'Active')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('shows how to start SlideKick when it cannot be reached', async () => {

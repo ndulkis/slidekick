@@ -1,12 +1,12 @@
-"""Runner keyboard controls and failure behavior without real camera imports."""
+"""The `slidekick` runner starts the camera per session, without real camera imports."""
 
 import importlib
 import sys
 import types
 from unittest.mock import Mock
 
+from slidekick.api_server import Backend
 from slidekick.contracts import SessionState
-from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.session_coordinator import SessionCoordinator
 
 # The runner only needs run_camera as an imported name; keep hardware libraries
@@ -24,46 +24,25 @@ finally:
         sys.modules["slidekick.recognition.camera"] = original_camera
 
 
-class Adapter:
-    def __init__(self):
-        self.calls = []
+def test_camera_runs_only_while_a_session_is_live():
+    backend = Backend(SessionCoordinator())
+    seen = {}
 
-    def next_slide(self):
-        self.calls.append("next")
-        return True
+    def camera(handler, on_ready, should_stop, **kwargs):
+        on_ready()
+        seen["camera"] = backend.camera
+        seen["stop_while_running"] = should_stop()
+        backend.end()  # the dashboard's End button
+        seen["stop_after_end"] = should_stop()
 
-    def previous_slide(self):
-        self.calls.append("previous")
-        return True
+    runner.run_camera = camera
+    backend.start()  # the dashboard's Start button
+    runner.run_one_session(backend)
 
-    def pause_presentation(self):
-        raise AssertionError("presentation must not be blanked")
-
-    def resume_presentation(self):
-        raise AssertionError("presentation must not be unblanked")
-
-    def end_presentation(self):
-        raise AssertionError("must not send ESC")
-
-
-def test_camera_key_controls_lifecycle_not_slideshow():
-    adapter = Adapter()
-    session = SessionCoordinator(gestures=GestureCommandController(adapter))
-    control = runner.make_key_handler(session)
-    session.start()
-    control(ord("p"))
-    assert session.state is SessionState.PAUSED
-    assert (
-        session.handle_event({"event_type": "gesture", "gesture": "swipe_right"})
-        is False
-    )
-    control(ord("e"))  # paused -> ended is not allowed yet
-    assert session.state is SessionState.PAUSED
-    control(ord("r"))
-    assert session.handle_event({"event_type": "gesture", "gesture": "swipe_right"})
-    control(ord("e"))
-    assert session.state is SessionState.ENDED
-    assert not session.handle_event({"event_type": "gesture", "gesture": "swipe_right"})
-    control(ord("s"))
-    assert session.state is SessionState.RUNNING
-    assert adapter.calls == ["next"]
+    assert seen == {
+        "camera": "ready",
+        "stop_while_running": False,
+        "stop_after_end": True,
+    }
+    assert backend.camera == "off"
+    assert backend.state is SessionState.ENDED
