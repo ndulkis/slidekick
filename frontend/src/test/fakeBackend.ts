@@ -25,6 +25,8 @@ function initial() {
     calibration: toBackend(DEFAULT_CALIBRATION) as Record<string, number>,
     /** When set, PUT /api/calibration answers 400. */
     rejectCalibration: false,
+    /** Set by POST /api/quit. */
+    hasQuit: false,
     gestureId: 0,
   }
 }
@@ -82,6 +84,11 @@ export function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise
       event: { type: t.type, previous_state: previous, new_state: t.to, use_case: t.use_case },
       ...status(),
     })
+  }
+
+  if (path === '/api/quit' && method === 'POST') {
+    fakeBackend.hasQuit = true
+    return json({ quitting: true })
   }
 
   if (path === '/api/calibration') {

@@ -36,6 +36,8 @@ describe('Session keyboard use (TC-08)', () => {
     expect(screen.getByRole('link', { name: 'Session' })).toHaveFocus()
     await user.tab()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Quit SlideKick' })).toHaveFocus()
     // End and Pause are disabled at Ready, so Start is the next stop.
     await user.tab()
     expect(button('Start session')).toHaveFocus()
@@ -72,8 +74,8 @@ describe('Session keyboard use (TC-08)', () => {
     button('Pause session').focus()
     await user.keyboard(' ')
 
-    // From Settings, Tab skips the disabled Start and End buttons.
-    screen.getByRole('link', { name: 'Settings' }).focus()
+    // From the header's last control, Tab skips the disabled Start and End buttons.
+    button('Quit SlideKick').focus()
     await user.tab()
 
     expect(button('Resume session')).toHaveFocus()

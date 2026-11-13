@@ -37,6 +37,8 @@ describe('Settings calibration keyboard use', () => {
     expect(screen.getByRole('link', { name: 'Session' })).toHaveFocus()
     await user.tab()
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Quit SlideKick' })).toHaveFocus()
 
     for (const name of [
       'Swipe distance',

@@ -50,7 +50,7 @@ Run from the repo root with `.venv` active. `slidekick` works from any folder.
 
 | Command | What it does |
 | --- | --- |
-| `slidekick` | Run SlideKick: the dashboard opens at `localhost:5173/session` (API on `127.0.0.1:5001`). Start a session there to turn on the camera and gesture control; Ctrl+C in the terminal quits |
+| `slidekick` | Run SlideKick: the dashboard opens in its own Chrome or Edge window (a browser tab at `localhost:5173/session` if neither is installed; API on `127.0.0.1:5001`). Start a session there to turn on the camera and gesture control. Quit with the dashboard's Quit SlideKick button, by closing that window, or with Ctrl+C in the terminal |
 | `python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
 | `python scripts/check_env.py` | Check the dev environment and print fixes |
 | `./scripts/verify.sh` | Run the environment check plus the main CI checks |

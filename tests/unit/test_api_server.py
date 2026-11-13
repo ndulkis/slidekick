@@ -1,6 +1,7 @@
 """Dashboard HTTP API over a real SessionCoordinator with a fake adapter."""
 
 import json
+import time
 
 from slidekick.api_server import Backend, create_app
 from slidekick.gesture_command_controller import GestureCommandController
@@ -186,3 +187,59 @@ def test_camera_stream_serves_frames_and_ends_when_the_camera_stops(tmp_path):
     # A stopped camera leaves no stale frame for the next session's stream.
     backend.camera_stopped()
     assert list(backend.frames(timeout=0.05)) == []
+
+
+def test_quit_stops_the_camera_and_wakes_an_idle_app(tmp_path):
+    client, backend, _ = make_client(tmp_path)
+
+    # Cross-site requests cannot quit the app.
+    res = client.post("/api/quit", data="x", content_type="text/plain")
+    assert res.status_code == 415
+    assert not backend.quitting
+
+    post(client, "/api/session/start")
+    backend.camera_ready()
+    backend._started.clear()  # as if the app loop were idle
+    assert post(client, "/api/quit").json == {"quitting": True}
+    assert backend.should_stop_camera()
+    assert backend._started.is_set()
+
+    # The camera loop exits and ends the live session on the way out.
+    backend.camera_stopped()
+    assert backend.state.value == "ended"
+
+
+def test_closing_the_dashboard_window_quits_but_a_reload_does_not(tmp_path):
+    _, backend, _ = make_client(tmp_path)
+    backend.quit_when_dashboard_closes = True
+
+    # Reload: the old page goes, a new one connects within the grace period.
+    backend.dashboard_connected()
+    backend.dashboard_disconnected(grace=0.05)
+    backend.dashboard_connected()
+    time.sleep(0.15)
+    assert not backend.quitting
+
+    # Closed: nothing reconnects.
+    backend.dashboard_disconnected(grace=0.05)
+    time.sleep(0.15)
+    assert backend.quitting
+
+
+def test_a_browser_tab_closing_never_quits(tmp_path):
+    _, backend, _ = make_client(tmp_path)  # quit_when_dashboard_closes off
+    backend.dashboard_connected()
+    backend.dashboard_disconnected(grace=0.01)
+    time.sleep(0.1)
+    assert not backend.quitting
+
+
+def test_alive_stream_counts_the_dashboard_while_connected(tmp_path):
+    client, backend, _ = make_client(tmp_path)
+    res = client.get("/api/alive", buffered=False)
+    assert res.mimetype == "text/event-stream"
+    chunks = iter(res.response)
+    assert next(chunks) == b"retry: 1000\n\n"
+    assert backend._dashboards == 1
+    res.close()  # the browser went away
+    assert backend._dashboards == 0

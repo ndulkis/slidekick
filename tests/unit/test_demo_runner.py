@@ -46,3 +46,39 @@ def test_camera_runs_only_while_a_session_is_live():
     }
     assert backend.camera == "off"
     assert backend.state is SessionState.ENDED
+
+
+def test_quit_while_idle_exits_without_opening_the_camera():
+    backend = Backend(SessionCoordinator())
+    runner.run_camera = Mock(side_effect=AssertionError("camera must stay off"))
+
+    backend.quit()
+    runner.run_one_session(backend)  # returns instead of blocking
+
+    assert backend.state is SessionState.IDLE
+    assert backend.camera == "off"
+
+
+def test_dashboard_opens_in_an_app_window_when_chrome_is_available(monkeypatch):
+    launched = []
+    monkeypatch.setattr(
+        runner.subprocess, "Popen", lambda cmd, **kw: launched.append(cmd)
+    )
+    monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/bin/node")
+    monkeypatch.setattr(runner, "wait_for_port", lambda port: True)
+
+    monkeypatch.setattr(runner, "find_app_browser", lambda: "/chrome")
+    assert len(runner.start_dashboard("/tmp/profile")) == 2
+    vite, browser = launched
+    assert "--open" not in vite
+    assert browser[:3] == [
+        "/chrome",
+        "--app=http://localhost:5173/session",
+        "--user-data-dir=/tmp/profile",
+    ]
+
+    # No Chrome or Edge: fall back to a tab in the default browser.
+    launched.clear()
+    monkeypatch.setattr(runner, "find_app_browser", lambda: None)
+    assert len(runner.start_dashboard("/tmp/profile")) == 1
+    assert launched[0][-2:] == ["--open", "/session"]

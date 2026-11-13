@@ -10,6 +10,7 @@ import dataclasses
 import json
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +91,12 @@ class Backend:
         # or starting -> error if the camera never opens.
         self.camera = "off"
         self._started = threading.Event()
+        # Set by the dashboard's Quit button; the app loop exits when it sees it.
+        self.quitting = False
+        # Open dashboards, counted by their /api/alive connections. When the
+        # app owns the dashboard window, closing it quits the app.
+        self.quit_when_dashboard_closes = False
+        self._dashboards = 0
         # Latest camera frame (JPEG) for the dashboard preview.
         self._frame: bytes | None = None
         self._frame_id = 0
@@ -153,7 +160,32 @@ class Backend:
         self._started.wait()
 
     def should_stop_camera(self) -> bool:
-        return self.state is SessionState.ENDED
+        return self.quitting or self.state is SessionState.ENDED
+
+    def quit(self) -> None:
+        """Ask the whole app to exit. A running camera loop stops on its next
+        frame, and an idle app loop is woken from wait_for_start.
+        """
+        self.quitting = True
+        self._started.set()
+
+    def dashboard_connected(self) -> None:
+        with self._lock:
+            self._dashboards += 1
+
+    def dashboard_disconnected(self, grace: float = 5.0) -> None:
+        """A dashboard went away. Quit unless one is back within grace seconds,
+        which is what a page reload looks like.
+        """
+        with self._lock:
+            self._dashboards -= 1
+        timer = threading.Timer(grace, self._quit_if_no_dashboard)
+        timer.daemon = True
+        timer.start()
+
+    def _quit_if_no_dashboard(self) -> None:
+        if self.quit_when_dashboard_closes and self._dashboards == 0:
+            self.quit()
 
     def camera_ready(self) -> None:
         self.camera = "ready"
@@ -251,6 +283,36 @@ def create_app(backend: Backend) -> Flask:
                 "use_case": event.use_case,
             },
             **backend.status(),
+        )
+
+    @app.post("/api/quit")
+    def quit_app():
+        backend.quit()
+        return jsonify(quitting=True)
+
+    @app.get("/api/alive")
+    def alive():
+        """Held open by every dashboard page (server-sent events), so the app
+        notices when the dashboard is closed. A connection, unlike polling,
+        is not slowed down while the window is hidden behind a slideshow.
+        """
+
+        def pings():
+            backend.dashboard_connected()
+            try:
+                # Reconnect quickly after a dropped connection.
+                yield "retry: 1000\n\n"
+                # Writing is how a closed connection is detected.
+                while not backend.quitting:
+                    yield ": ping\n\n"
+                    time.sleep(1)
+            finally:
+                backend.dashboard_disconnected()
+
+        return Response(
+            pings(),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
         )
 
     @app.get("/api/camera")
