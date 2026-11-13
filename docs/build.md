@@ -15,6 +15,7 @@ These are pinned in `.python-version` and `.nvmrc` (the source of truth) and mir
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.lock
+pip install -e .
 ```
 
 `requirements.lock` is generated from `requirements.in` with `pip-compile`. Edit `requirements.in`, never the lock file directly.

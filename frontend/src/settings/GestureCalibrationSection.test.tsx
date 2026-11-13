@@ -1,38 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { fakeBackend } from '../test/fakeBackend'
 import GestureCalibrationSection from './GestureCalibrationSection'
-import { CALIBRATION_STORAGE_KEY, DEFAULT_CALIBRATION } from './calibrationSettings'
-
-function memoryStorage(initial: Record<string, string> = {}) {
-  const data = new Map(Object.entries(initial))
-  return {
-    getItem: (key: string) => data.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      data.set(key, value)
-    },
-    removeItem: (key: string) => {
-      data.delete(key)
-    },
-  }
-}
-
-function failingStorage() {
-  return {
-    getItem: () => null,
-    setItem: () => {
-      throw new Error('quota exceeded')
-    },
-    removeItem: () => {},
-  }
-}
+import { DEFAULT_CALIBRATION } from './calibrationSettings'
 
 function slider(name: string) {
   return screen.getByLabelText(name) as HTMLInputElement
 }
 
+function click(name: string) {
+  fireEvent.click(screen.getByRole('button', { name }))
+}
+
 describe('GestureCalibrationSection', () => {
   it('shows the four calibration sliders with the defaults', () => {
-    render(<GestureCalibrationSection storage={memoryStorage()} />)
+    render(<GestureCalibrationSection />)
 
     expect(screen.getByRole('heading', { name: 'Gesture Calibration' })).toBeInTheDocument()
     expect(screen.getAllByRole('slider')).toHaveLength(4)
@@ -40,62 +22,59 @@ describe('GestureCalibrationSection', () => {
     expect(slider('Time between gestures').value).toBe(String(DEFAULT_CALIBRATION.cooldown))
   })
 
-  it('says the settings are not applied to recognition yet', () => {
-    render(<GestureCalibrationSection storage={memoryStorage()} />)
-    expect(
-      screen.getByText(/these settings aren't applied to gesture recognition yet/),
-    ).toBeInTheDocument()
+  it('loads the calibration SlideKick is using', async () => {
+    fakeBackend.calibration.swipe_cooldown = 2.5
+    render(<GestureCalibrationSection />)
+
+    await waitFor(() => expect(slider('Time between gestures').value).toBe('2.5'))
   })
 
-  it('loads a saved profile', () => {
-    const storage = memoryStorage({
-      [CALIBRATION_STORAGE_KEY]: JSON.stringify({ ...DEFAULT_CALIBRATION, cooldown: 2.5 }),
-    })
-    render(<GestureCalibrationSection storage={storage} />)
+  it('keeps the defaults and says so when SlideKick is not running', async () => {
+    fakeBackend.online = false
+    render(<GestureCalibrationSection />)
 
-    expect(slider('Time between gestures').value).toBe('2.5')
+    expect(await screen.findByText(/Can't reach SlideKick/)).toBeInTheDocument()
+    expect(slider('Swipe distance').value).toBe(String(DEFAULT_CALIBRATION.swipeDistance))
   })
 
-  it('saves changes and announces it', () => {
-    const storage = memoryStorage()
-    render(<GestureCalibrationSection storage={storage} />)
+  it('saves changes to SlideKick and announces it', async () => {
+    render(<GestureCalibrationSection />)
 
     fireEvent.change(slider('Swipe distance'), { target: { value: '0.15' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save calibration' }))
+    click('Save calibration')
 
-    expect(screen.getByRole('status')).toHaveTextContent('Calibration saved.')
-    expect(JSON.parse(storage.getItem(CALIBRATION_STORAGE_KEY)!)).toMatchObject({
-      swipeDistance: 0.15,
-    })
+    expect(await screen.findByText('Calibration saved.')).toBeInTheDocument()
+    expect(fakeBackend.calibration.min_displacement).toBe(0.15)
   })
 
-  it('resets to the defaults and announces it', () => {
-    const storage = memoryStorage({
-      [CALIBRATION_STORAGE_KEY]: JSON.stringify({ ...DEFAULT_CALIBRATION, cooldown: 2.5 }),
-    })
-    render(<GestureCalibrationSection storage={storage} />)
+  it('resets SlideKick to the defaults and announces it', async () => {
+    fakeBackend.calibration.swipe_cooldown = 2.5
+    render(<GestureCalibrationSection />)
+    await waitFor(() => expect(slider('Time between gestures').value).toBe('2.5'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reset to defaults' }))
+    click('Reset to defaults')
 
+    expect(await screen.findByText('Calibration reset to defaults.')).toBeInTheDocument()
     expect(slider('Time between gestures').value).toBe(String(DEFAULT_CALIBRATION.cooldown))
-    expect(screen.getByRole('status')).toHaveTextContent('Calibration reset to defaults.')
-    expect(storage.getItem(CALIBRATION_STORAGE_KEY)).toBeNull()
+    expect(fakeBackend.calibration.swipe_cooldown).toBe(DEFAULT_CALIBRATION.cooldown)
   })
 
-  it('shows an alert when saving fails', () => {
-    render(<GestureCalibrationSection storage={failingStorage()} />)
+  it('shows an alert when saving fails', async () => {
+    fakeBackend.rejectCalibration = true
+    render(<GestureCalibrationSection />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save calibration' }))
+    click('Save calibration')
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('alert')).toHaveTextContent(
       "Your calibration couldn't be saved. Try again. Your previous settings are still in use.",
     )
     expect(screen.getByRole('status')).toHaveTextContent('')
   })
 
-  it('clears the last message when a setting changes', () => {
-    render(<GestureCalibrationSection storage={memoryStorage()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Save calibration' }))
+  it('clears the last message when a setting changes', async () => {
+    render(<GestureCalibrationSection />)
+    click('Save calibration')
+    await screen.findByText('Calibration saved.')
 
     fireEvent.change(slider('Recognition strictness'), { target: { value: '0.7' } })
 

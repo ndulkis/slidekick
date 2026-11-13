@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { fakeBackend } from '../test/fakeBackend'
 import SessionPage from './SessionPage'
 
 function button(name: string) {
@@ -10,157 +11,169 @@ function badge() {
   return screen.getByText(/^(Session starting|Ready|Active|Paused|Ended|Error)$/)
 }
 
-function startSession() {
-  fireEvent.click(button('Start session'))
+async function expectBadge(text: string) {
+  await waitFor(() => expect(badge()).toHaveTextContent(text))
+}
+
+async function renderPage(expected = 'Ready') {
+  render(<SessionPage />)
+  await expectBadge(expected)
+}
+
+async function click(name: string, expected: string) {
+  fireEvent.click(button(name))
+  await expectBadge(expected)
 }
 
 describe('SessionPage', () => {
-  it('renders the default Ready state', () => {
+  it('shows Session starting until SlideKick replies', async () => {
     render(<SessionPage />)
-    expect(screen.getByText('Ready')).toBeInTheDocument()
+    expect(badge()).toHaveTextContent('Session starting')
+    expect(screen.getByText('Presentation: Connecting')).toBeInTheDocument()
+    await expectBadge('Ready')
+  })
+
+  it('renders the Ready state from the backend', async () => {
+    await renderPage()
     expect(screen.getByText('Presentation: Connected')).toBeInTheDocument()
     expect(button('Start session')).toBeEnabled()
   })
 
-  it('shows camera unavailable message when camera is missing', () => {
-    render(<SessionPage />)
-    fireEvent.click(button('camera unavailable'))
+  it('shows Session starting while the camera starts', async () => {
+    fakeBackend.cameraOnStart = 'starting'
+    await renderPage()
+    await click('Start session', 'Session starting')
+    expect(screen.getByText('Starting camera...')).toBeInTheDocument()
+    expect(button('End session')).toBeDisabled()
+
+    fakeBackend.camera = 'ready'
+    await expectBadge('Active')
+  })
+
+  it('lets the user retry when the camera failed to start', async () => {
+    // The backend ends the session when the camera can't open.
+    fakeBackend.state = 'ended'
+    fakeBackend.camera = 'error'
+    await renderPage('Ended')
+    expect(screen.getByRole('alert')).toHaveTextContent("The camera couldn't start.")
     expect(screen.getByText('No camera source is available.')).toBeInTheDocument()
+
+    await click('Start new session', 'Active')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('switches to Active and shows Pause control after Start', () => {
-    render(<SessionPage />)
-    startSession()
-    expect(badge()).toHaveTextContent('Active')
-    expect(button('Pause session')).toBeEnabled()
+  it('shows how to start SlideKick when it cannot be reached', async () => {
+    fakeBackend.online = false
+    await renderPage('Error')
+    expect(screen.getByText(/Can't reach SlideKick/)).toBeInTheDocument()
+    expect(screen.getByText('Presentation: Disconnected')).toBeInTheDocument()
   })
 
-  it('shows gesture feedback with confidence when a gesture is selected', () => {
-    render(<SessionPage />)
-    startSession()
-    fireEvent.click(button('next'))
+  it('shows a presentation error from the backend', async () => {
+    fakeBackend.presentationError = 'Presentation command failed: boom'
+    await renderPage()
+    expect(screen.getByText('Presentation: Error')).toBeInTheDocument()
+    expect(screen.getByText('Presentation command failed: boom')).toBeInTheDocument()
+  })
+
+  it('shows recognized gestures with confidence', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+
+    fakeBackend.emitGesture('next', 0.92)
+
+    expect(await screen.findByText('92% confidence')).toBeInTheDocument()
     expect(screen.getAllByText('Next').length).toBeGreaterThan(0)
-    expect(screen.getByText('92% confidence')).toBeInTheDocument()
   })
 
-  it('treats no-gesture as a normal state, not an error', () => {
-    render(<SessionPage />)
-    startSession()
-    fireEvent.click(button('none'))
+  it('treats no gesture as a normal state, not an error', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
     expect(screen.getByText('No gesture detected')).toBeInTheDocument()
   })
 
-  it('shows the error message when an error is simulated', () => {
-    render(<SessionPage />)
-    fireEvent.click(button('simulate error'))
-    expect(
-      screen.getByText(
-        'Something required by this session is unavailable. Check camera access and try again.',
-      ),
-    ).toBeInTheDocument()
-  })
+  it('walks through start, pause, resume, and end', async () => {
+    await renderPage()
 
-  it('walks through start, pause, resume, and end', () => {
-    render(<SessionPage />)
-
-    startSession()
-    expect(badge()).toHaveTextContent('Active')
+    await click('Start session', 'Active')
     expect(button('End session')).toBeEnabled()
 
-    fireEvent.click(button('Pause session'))
-    expect(badge()).toHaveTextContent('Paused')
+    await click('Pause session', 'Paused')
     // The session state model doesn't allow ending while paused.
     expect(button('End session')).toBeDisabled()
 
-    fireEvent.click(button('Resume session'))
-    expect(badge()).toHaveTextContent('Active')
+    await click('Resume session', 'Active')
     expect(button('End session')).toBeEnabled()
 
-    fireEvent.click(button('End session'))
-    expect(badge()).toHaveTextContent('Ended')
+    await click('End session', 'Ended')
     expect(button('Start new session')).toBeEnabled()
     expect(button('Pause session')).toBeDisabled()
+    expect(screen.getByText('Camera off')).toBeInTheDocument()
   })
 
-  it('shows a message for each session state', () => {
-    render(<SessionPage />)
+  it('shows a message for each session state', async () => {
+    await renderPage()
 
-    startSession()
+    await click('Start session', 'Active')
     expect(
       screen.getByText('Gesture recognition is on. Gestures will control your presentation.'),
     ).toBeInTheDocument()
 
-    fireEvent.click(button('Pause session'))
+    await click('Pause session', 'Paused')
     expect(
       screen.getByText('Gesture recognition paused. Gestures will not control your presentation.'),
     ).toBeInTheDocument()
 
-    fireEvent.click(button('Resume session'))
-    fireEvent.click(button('End session'))
+    await click('Resume session', 'Active')
+    await click('End session', 'Ended')
     expect(
       screen.getByText("Session ended. Start a new session when you're ready."),
     ).toBeInTheDocument()
-    expect(screen.getByText('Camera off')).toBeInTheDocument()
   })
 
-  it('does not show gestures while paused', () => {
-    render(<SessionPage />)
-    startSession()
-    fireEvent.click(button('Pause session'))
-
-    fireEvent.click(button('next'))
+  it('does not show gestures while paused', async () => {
+    fakeBackend.state = 'paused'
+    fakeBackend.emitGesture('next', 0.92)
+    await renderPage('Paused')
 
     expect(screen.getByText('Gesture recognition paused')).toBeInTheDocument()
     expect(screen.queryByText('Next')).not.toBeInTheDocument()
     expect(screen.queryByText('92% confidence')).not.toBeInTheDocument()
   })
 
-  it('clears the last gesture after pausing and resuming', () => {
-    render(<SessionPage />)
-    startSession()
-    fireEvent.click(button('next'))
-    expect(screen.getByText('92% confidence')).toBeInTheDocument()
+  it('clears the last gesture after pausing and resuming', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+    fakeBackend.emitGesture('next', 0.92)
+    expect(await screen.findByText('92% confidence')).toBeInTheDocument()
 
-    fireEvent.click(button('Pause session'))
-    fireEvent.click(button('Resume session'))
+    await click('Pause session', 'Paused')
+    await click('Resume session', 'Active')
 
     expect(screen.getByText('No gesture detected')).toBeInTheDocument()
     expect(screen.queryByText('92% confidence')).not.toBeInTheDocument()
   })
 
-  it('blocks actions that are not valid in the current state', () => {
-    render(<SessionPage />)
+  it('can start a new session after ending', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+    await click('End session', 'Ended')
 
-    startSession()
-    expect(button('Start session')).toBeDisabled()
-
-    fireEvent.click(button('Pause session'))
-    expect(screen.queryByRole('button', { name: 'Pause session' })).not.toBeInTheDocument()
-    expect(button('Resume session')).toBeEnabled()
-    expect(button('Start session')).toBeDisabled()
-  })
-
-  it('can start a new session after ending', () => {
-    render(<SessionPage />)
-    startSession()
-    fireEvent.click(button('End session'))
-
-    fireEvent.click(button('Start new session'))
-    expect(badge()).toHaveTextContent('Active')
+    await click('Start new session', 'Active')
     expect(button('End session')).toBeEnabled()
   })
 
-  it('disables session controls during an error and recovers when cleared', () => {
-    render(<SessionPage />)
-    fireEvent.click(button('simulate error'))
+  it('disables session controls during an error and recovers', async () => {
+    fakeBackend.online = false
+    await renderPage('Error')
 
     const controls = within(button('Start session').parentElement as HTMLElement)
     for (const control of controls.getAllByRole('button')) {
       expect(control).toBeDisabled()
     }
 
-    fireEvent.click(button('clear'))
-    expect(badge()).toHaveTextContent('Ready')
+    fakeBackend.online = true
+    await expectBadge('Ready')
     expect(button('Start session')).toBeEnabled()
   })
 })

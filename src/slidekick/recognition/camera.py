@@ -364,6 +364,18 @@ def process_hand_detection(
 # ============================================================
 
 
+def close_camera_windows():
+    """Close the preview window and wait until it is really gone."""
+
+    cv2.destroyAllWindows()
+
+    # On macOS the window only disappears once the GUI event loop runs again,
+    # and this process may now sit idle until the next session. Measured:
+    # 5 x 1 ms is not enough, 30 x 10 ms is.
+    for _ in range(30):
+        cv2.waitKey(10)
+
+
 def should_close_window(window_name, key):
     """Check whether the user requested to close the camera."""
 
@@ -412,6 +424,10 @@ def run_camera(
     calibration: GestureCalibration | None = None,
     key_handler=None,
     enable_static_events=False,
+    get_calibration=None,
+    on_ready=None,
+    should_stop=None,
+    on_frame=None,
 ):
     """Run the SlideKick camera and gesture recognition loop.
 
@@ -423,12 +439,30 @@ def run_camera(
         calibration:
             Optional custom recognition settings. If omitted,
             SlideKick uses its tested default thresholds.
+
+        get_calibration:
+            Optional callable returning the current calibration. It is
+            read every frame, so changes apply while the camera runs.
+            Takes priority over calibration.
+
+        on_ready:
+            Optional callback run once the camera and recognizer are up.
+
+        on_frame:
+            Optional callback receiving each processed frame as JPEG
+            bytes. When given, the frames go there instead of to a
+            camera window, so no window is opened and the window keys
+            (Q, Space) are not available.
+
+        should_stop:
+            Optional callable checked every frame. The loop exits and
+            releases the camera when it returns True.
     """
 
     # --------------------------------------------------------
     # A. Initialize camera window and capture device
     # --------------------------------------------------------
-    window_name = create_camera_window()
+    window_name = create_camera_window() if on_frame is None else None
 
     # Camera index 0 selects the computer's default webcam.
     camera = cv2.VideoCapture(0)
@@ -498,7 +532,8 @@ def run_camera(
     if not camera.isOpened():
         print("Error: Could not open camera.")
         camera.release()
-        cv2.destroyAllWindows()
+        if window_name is not None:
+            close_camera_windows()
         return
 
     # --------------------------------------------------------
@@ -514,11 +549,17 @@ def run_camera(
         last_gesture_name = "none"
         last_gesture_confidence = 0.0
 
+        if on_ready is not None:
+            on_ready()
+
         # ----------------------------------------------------
         # F. Main frame-processing loop
         # ----------------------------------------------------
 
         while True:
+            if should_stop is not None and should_stop():
+                break
+
             # Read the next camera frame.
             success, frame = camera.read()
 
@@ -564,7 +605,7 @@ def run_camera(
                 position_history,
                 gesture_state,
                 missed_hand_frames,
-                calibration=calibration,
+                calibration=get_calibration() if get_calibration else calibration,
             )
 
             # Extract static classification from the same MediaPipe result.
@@ -669,6 +710,17 @@ def run_camera(
                 last_gesture_confidence,
             )
 
+            if on_frame is not None:
+                # Send the processed frame to the dashboard preview.
+                # camera.read() paces the loop, so no waitKey is needed.
+                preview = cv2.resize(frame, (WINDOW_WIDTH, WINDOW_HEIGHT))
+                encoded, jpeg = cv2.imencode(
+                    ".jpg", preview, [cv2.IMWRITE_JPEG_QUALITY, 75]
+                )
+                if encoded:
+                    on_frame(jpeg.tobytes())
+                continue
+
             # Display the processed frame in the camera window.
             cv2.imshow(window_name, frame)
 
@@ -724,7 +776,8 @@ def run_camera(
     camera.release()
 
     # Close all OpenCV windows created by the application.
-    cv2.destroyAllWindows()
+    if window_name is not None:
+        close_camera_windows()
 
 
 # ============================================================

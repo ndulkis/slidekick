@@ -66,7 +66,7 @@ Rules:
 
 ### Recognition → Gesture command controller
 
-Recognition emits events through a handler passed to `run_camera`. `scripts/run_gesture_control.py` passes `GestureCommandController.handle_event`, so each event goes straight to the controller.
+Recognition emits events through a handler passed to `run_camera`. `src/slidekick/app.py` (the `slidekick` command) passes `Backend.handle_event` from `api_server.py`, which runs it through `SessionCoordinator` and on to `GestureCommandController`.
 
 ### Session controller → Subscribers
 
