@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that the SlideKick dev environment is set up correctly.
 
-Run it with `PYTHONPATH=src python scripts/check_env.py` (or via
+Run it with `python scripts/check_env.py` (or via
 scripts/verify.sh). It uses only the standard library, so it still gives a
 useful report when dependencies are missing or out of date.
 
@@ -91,8 +91,8 @@ def check_slidekick_importable() -> Result:
         return Result(
             FAIL,
             name,
-            f"PYTHONPATH={os.environ.get('PYTHONPATH', '(unset)')}",
-            "Run with `PYTHONPATH=src` from the repo root.",
+            str(locations[0]) if locations else "not installed",
+            "Run `pip install -e .` from the repo root.",
         )
     return Result(PASS, name)
 
@@ -252,7 +252,7 @@ def check_configuration() -> Result:
         from slidekick.config import ConfigError, load_settings
     except ImportError as exc:
         return Result(
-            FAIL, name, str(exc), "Run with `PYTHONPATH=src` from the repo root."
+            FAIL, name, str(exc), "Run `pip install -e .` from the repo root."
         )
     try:
         settings = load_settings()
