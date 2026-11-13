@@ -1,14 +1,18 @@
+"""The `slidekick` command: camera recognition, the dashboard API, and the
+dashboard itself, started together.
+"""
+
+import os
 import shutil
 import subprocess
 import threading
 from pathlib import Path
 
-from slidekick.api_server import API_PORT, Backend, serve_in_background
-from slidekick.gesture_command_controller import GestureCommandController
-from slidekick.presentation_adapter import KeyboardPresentationAdapter
-from slidekick.recognition.camera import run_camera
-from slidekick.session_controller import InvalidTransitionError
-from slidekick.session_coordinator import SessionCoordinator
+from .api_server import API_PORT, Backend, serve_in_background
+from .gesture_command_controller import GestureCommandController
+from .recognition.camera import run_camera
+from .session_controller import InvalidTransitionError
+from .session_coordinator import SessionCoordinator
 
 
 def make_key_handler(session: SessionCoordinator):
@@ -34,7 +38,9 @@ def make_key_handler(session: SessionCoordinator):
     return handle_key
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+# ponytail: assumes an editable install from a checkout (`pip install -e .`);
+# the models, data/ and frontend/ live in the repo, not in the package.
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_PORT = 5173
 
 
@@ -66,16 +72,12 @@ def start_dashboard() -> subprocess.Popen | None:
 
 
 def main():
-    adapter = KeyboardPresentationAdapter()
-    controller = GestureCommandController(
-        adapter=adapter,
-        gesture_bindings={
-            "swipe_right": "next",
-            "swipe_left": "previous",
-            "pinch": "end",
-        },
-    )
-    session = SessionCoordinator(gestures=controller)
+    # The camera loop opens models/ and data/ by relative path, so run from the
+    # repo root wherever `slidekick` was typed.
+    os.chdir(REPO_ROOT)
+    # Default bindings: swipes only. "end" is not bindable by policy
+    # (command_policy.py), so no gesture can close the slideshow.
+    session = SessionCoordinator(gestures=GestureCommandController())
     backend = Backend(session, calibration_path=REPO_ROOT / "data/calibration.json")
     serve_in_background(backend)
     print(f"Dashboard API: http://127.0.0.1:{API_PORT}/api/session")
@@ -108,7 +110,3 @@ def run_session(backend: Backend) -> None:
             threading.Event().wait()
         except KeyboardInterrupt:
             pass
-
-
-if __name__ == "__main__":
-    main()

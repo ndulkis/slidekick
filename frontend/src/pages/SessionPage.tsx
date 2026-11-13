@@ -51,8 +51,7 @@ function SessionPage() {
 
       {connection === 'offline' && (
         <p className="session-message">
-          Can't reach SlideKick. Start it with{' '}
-          <code>PYTHONPATH=src python scripts/run_gesture_control.py</code>.
+          Can't reach SlideKick. Start it with <code>slidekick</code>.
         </p>
       )}
       {session.presentationError && (
