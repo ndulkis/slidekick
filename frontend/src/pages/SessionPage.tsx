@@ -1,4 +1,5 @@
 import { useSession } from '../core/useSession'
+import CameraPicker from '../settings/CameraPicker'
 import CameraPreview from '../session/CameraPreview'
 import GestureFeedback from '../session/GestureFeedback'
 import GestureFeedbackToast from '../session/GestureFeedbackToast'
@@ -61,12 +62,23 @@ function SessionPage() {
 
       {camera === 'error' && (
         <p className="session-message" role="alert">
-          The camera couldn't start. Check camera access for the terminal running SlideKick,
-          then start a new session.
+          The camera couldn't start.{' '}
+          {navigator.userAgent.includes('Windows')
+            ? 'Turn on "Let desktop apps access your camera" in Settings > Privacy & security > Camera'
+            : 'Check camera access for the terminal running SlideKick'}
+          , then start a new session.
         </p>
       )}
 
       <CameraPreview status={status} hasCamera={camera !== 'error'} />
+
+      {/* Shows the camera in use, so a failed switch shows the camera kept. */}
+      <CameraPicker disabled={camera === 'starting'} selected={session.cameraId} />
+      {session.cameraMessage && (
+        <p className="session-message" role="alert">
+          {session.cameraMessage}
+        </p>
+      )}
 
       <GestureFeedback status={status} event={visibleEvent} />
 

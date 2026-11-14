@@ -50,7 +50,10 @@ def locked_packages() -> dict[str, str]:
     pins = {}
     for line in (ROOT / "requirements.lock").read_text().splitlines():
         match = re.match(r"^([A-Za-z0-9._-]+)==([^\s;]+)", line)
-        if match:
+        # Skip packages for another OS, like `; sys_platform == "win32"`.
+        # ponytail: only this marker form; use packaging.markers for others.
+        platform = re.search(r';\s*sys_platform\s*==\s*"([^"]+)"', line)
+        if match and (platform is None or platform.group(1) == sys.platform):
             pins[match.group(1)] = match.group(2)
     return pins
 

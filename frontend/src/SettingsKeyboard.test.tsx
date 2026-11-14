@@ -30,6 +30,7 @@ function button(name: string) {
 describe('Settings calibration keyboard use', () => {
   it('reaches every calibration control with Tab in order', async () => {
     const user = renderSettings()
+    await screen.findByRole('combobox', { name: 'Camera' })
 
     await user.tab()
     expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveFocus()
@@ -39,6 +40,8 @@ describe('Settings calibration keyboard use', () => {
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveFocus()
     await user.tab()
     expect(screen.getByRole('button', { name: 'Quit SlideKick' })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('combobox', { name: 'Camera' })).toHaveFocus()
 
     for (const name of [
       'Swipe distance',

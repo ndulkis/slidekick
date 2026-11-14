@@ -42,7 +42,43 @@ python scripts/check_env.py
 - Activate `.venv` in every new terminal.
 - If PowerShell blocks `Activate.ps1`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 - On Windows, run `verify.sh` from Git Bash.
-- After pulling, if the environment check fails, rerun `pip install -r requirements.lock` or `npm --prefix frontend ci`.
+
+## Updating an existing copy
+
+Already cloned SlideKick? After pulling new code, reinstall the dependencies, because new code can add packages. The camera picker, for example, added `cv2-enumerate-cameras` on Windows. Close SlideKick first.
+
+**macOS**
+
+```bash
+cd slidekick
+git pull
+source .venv/bin/activate
+pip install -r requirements.lock
+pip install -e .
+npm --prefix frontend ci
+python scripts/check_env.py
+```
+
+**Windows (PowerShell)**
+
+```powershell
+cd slidekick
+git pull
+.venv\Scripts\Activate.ps1
+pip install -r requirements.lock
+pip install -e .
+npm --prefix frontend ci
+python scripts/check_env.py
+```
+
+Then run `slidekick`. If the environment check still fails, it prints the fix for each problem.
+
+**Choosing a camera:** pick the camera under the preview on the Session page, or on the Settings page. It switches right away, even during a session, and SlideKick remembers it (`data/camera.json`). The picker only appears when there is more than one camera.
+
+- **macOS:** an iPhone nearby with Continuity Camera shows up as a camera. SlideKick uses the Mac's own camera unless you pick the iPhone. If the iPhone locks or goes out of range mid-session, SlideKick switches back to the Mac's camera.
+- **Windows:** cameras are listed by name. Virtual cameras (OBS, Teams, Phone Link) are only used if you pick them.
+- **Linux:** there is no picker. Set `SLIDEKICK_CAMERA_INDEX` in `.env` instead.
+- **Switch failed?** A camera that hasn't sent a picture within 2.5 seconds is skipped, and you keep the camera you had. The terminal prints how long each switch took.
 
 ## Commands
 
@@ -74,7 +110,7 @@ Every setting is optional. To override one, copy `.env.example` to `.env`. Real 
 | `SLIDEKICK_ENV` | `development` | `development`, `test`, `production` |
 | `SLIDEKICK_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `SLIDEKICK_MODEL_PATH` | `models/gesture_recognizer.task` | Path relative to the repo root |
-| `SLIDEKICK_CAMERA_INDEX` | `0` | `0`, `1`, `2`, ... |
+| `SLIDEKICK_CAMERA_INDEX` | `0` | `0`, `1`, `2`, ... (Linux, or Windows without `cv2-enumerate-cameras`; macOS and Windows use the dashboard's camera picker) |
 | `SLIDEKICK_CAMERA_BACKEND` | `avfoundation` (macOS), `msmf` (Windows), `v4l2` (Linux) | That OS's default, `any`, or `dshow` on Windows |
 
 Never commit real secrets. Add the name to `.env.example` with an empty value, and put CI secrets under GitHub **Settings → Secrets and variables → Actions**.

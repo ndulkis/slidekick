@@ -22,6 +22,10 @@ type StatusBody = {
   camera: CameraStatus
   last_gesture: { id: number; gesture: Gesture; confidence: number | null } | null
   presentation_error: string | null
+  /** Why the camera in use isn't the one selected, e.g. a failed switch. */
+  camera_message?: string | null
+  /** The camera in use, or being switched to. */
+  camera_id?: string | null
 }
 
 type ActionBody = StatusBody & {
@@ -40,6 +44,8 @@ export function useSession() {
   const [state, setState] = useState<SessionState>('idle')
   const [camera, setCamera] = useState<CameraStatus>('off')
   const [presentationError, setPresentationError] = useState<string | null>(null)
+  const [cameraMessage, setCameraMessage] = useState<string | null>(null)
+  const [cameraId, setCameraId] = useState<string | null>(null)
   const [lastGesture, setLastGesture] = useState<LastGesture | null>(null)
 
   const apply = useCallback((body: StatusBody) => {
@@ -47,6 +53,8 @@ export function useSession() {
     setState(body.state)
     setCamera(body.camera)
     setPresentationError(body.presentation_error)
+    setCameraMessage(body.camera_message ?? null)
+    setCameraId(body.camera_id ?? null)
     const next = body.last_gesture
     // Keep the same object while the id is unchanged, so polling doesn't
     // look like a new gesture (the toast re-shows on every new object).
@@ -102,6 +110,8 @@ export function useSession() {
     state,
     camera,
     presentationError,
+    cameraMessage,
+    cameraId,
     lastGesture,
     start: useCallback(() => act('start'), [act]),
     pause: useCallback(() => act('pause'), [act]),

@@ -17,6 +17,7 @@ from typing import Any
 from flask import Flask, Response, jsonify, request
 
 from .contracts import SessionState
+from .recognition.camera import list_cameras, resolve_camera
 from .recognition.swipe_recognizer import GestureCalibration
 from .session_controller import InvalidTransitionError
 from .session_coordinator import PresentationCommandError, SessionCoordinator
@@ -76,17 +77,44 @@ def load_calibration(path: Path | None) -> GestureCalibration:
         return default
 
 
+def load_camera_id(path: Path | None) -> str | None:
+    """The saved camera's unique ID, or None if nothing valid is saved."""
+    try:
+        camera_id = json.loads(path.read_text())["id"] if path else None
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
+        return None
+    return camera_id if isinstance(camera_id, str) else None
+
+
+class CameraError(ValueError):
+    """The submitted camera is not one of the connected cameras."""
+
+
 class Backend:
     """Thread-safe facade over the session that the camera loop and the HTTP
     API share.
     """
 
     def __init__(
-        self, coordinator: SessionCoordinator, calibration_path: Path | None = None
+        self,
+        coordinator: SessionCoordinator,
+        calibration_path: Path | None = None,
+        camera_path: Path | None = None,
     ) -> None:
         self.coordinator = coordinator
         self.calibration_path = calibration_path
         self.calibration = load_calibration(calibration_path)
+        # The chosen camera is saved by unique ID, because indexes shift
+        # when an iPhone connects or disconnects.
+        self.camera_path = camera_path
+        self.camera_id = load_camera_id(camera_path)
+        # The camera the loop should use, a list_cameras() entry. The camera
+        # loop switches whenever its id changes.
+        self.active_camera: dict[str, Any] | None = None
+        # The camera in use before a switch, restored if the switch fails.
+        self._switching_from: dict[str, Any] | None = None
+        # Why the camera isn't the one selected, shown on the Session page.
+        self.camera_message: str | None = None
         # off -> starting (session started) -> ready -> off (session ended),
         # or starting -> error if the camera never opens.
         self.camera = "off"
@@ -112,6 +140,11 @@ class Backend:
     def start(self):
         def start():
             event = self.coordinator.start()
+            # A missing camera (phone out of range) falls back to the
+            # built-in one rather than failing the session.
+            self.active_camera = resolve_camera(list_cameras(), self.camera_id)
+            self._switching_from = None
+            self.camera_message = None
             if self.camera != "ready":
                 self.camera = "starting"
             self._started.set()
@@ -188,7 +221,9 @@ class Backend:
             self.quit()
 
     def camera_ready(self) -> None:
+        """The camera opened, at session start or after a switch."""
         self.camera = "ready"
+        self._switching_from = None
 
     def set_frame(self, jpeg: bytes) -> None:
         with self._frame_ready:
@@ -230,6 +265,81 @@ class Backend:
                 self.coordinator.end()
             self.last_gesture = None
 
+    def get_camera(self) -> dict[str, Any] | None:
+        return self.active_camera
+
+    def _save_camera_id(self, camera_id: str | None) -> None:
+        self.camera_id = camera_id
+        if self.camera_path is not None:
+            self.camera_path.parent.mkdir(parents=True, exist_ok=True)
+            self.camera_path.write_text(json.dumps({"id": camera_id}))
+
+    def _switch_to(self, camera: dict[str, Any]) -> None:
+        """Point the camera loop at camera. Call with the lock held."""
+        if self.camera in ("starting", "ready") and self.active_camera is not None:
+            if camera["id"] == self.active_camera["id"]:
+                return
+            # The camera the loop has open, which keeps streaming until the
+            # loop calls camera_ready (switched) or camera_switch_failed. A
+            # second choice during a switch must not replace it.
+            if self._switching_from is None:
+                self._switching_from = self.active_camera
+        self.active_camera = camera
+
+    def cameras(self) -> dict[str, Any]:
+        cameras = list_cameras()
+        with self._lock:
+            in_use = self.camera in ("starting", "ready") and self.active_camera
+            selected = in_use or resolve_camera(cameras, self.camera_id)
+        return {
+            "cameras": [{"id": c["id"], "name": c["name"]} for c in cameras],
+            "selected": selected["id"] if selected else None,
+        }
+
+    def set_camera(self, data: Any) -> dict[str, Any]:
+        """Select a camera by unique ID. Works during a session: the loop
+        switches to it on its next frame.
+        """
+        camera_id = data.get("id") if isinstance(data, dict) else None
+        camera = next((c for c in list_cameras() if c["id"] == camera_id), None)
+        if camera is None:
+            raise CameraError("Unknown camera")
+        with self._lock:
+            self._save_camera_id(camera["id"])
+            self.camera_message = None
+            self._switch_to(camera)
+        return self.cameras()
+
+    def camera_switch_failed(self) -> None:
+        """The loop couldn't open the new camera and kept the old one."""
+        with self._lock:
+            failed, working = self.active_camera, self._switching_from
+            if failed is None or working is None:
+                return
+            self.camera_message = (
+                f"Couldn't switch to {failed['name']}, still using {working['name']}."
+            )
+            self.active_camera = working
+            self._switching_from = None
+            self._save_camera_id(working["id"])
+            self.camera = "ready"
+
+    def camera_lost(self) -> bool:
+        """The open camera stopped sending frames (phone locked or out of
+        range). Switch to another camera if there is one.
+        """
+        lost = self.active_camera
+        others = [c for c in list_cameras() if lost is None or c["id"] != lost["id"]]
+        fallback = resolve_camera(others, None)
+        if lost is None or fallback is None:
+            return False
+        with self._lock:
+            self._switch_to(fallback)
+            self.camera_message = (
+                f"Lost {lost['name']}, switched to {fallback['name']}."
+            )
+        return True
+
     def set_calibration(self, data: Any) -> GestureCalibration:
         calibration = parse_calibration(data, self.calibration)
         if self.calibration_path is not None:
@@ -247,6 +357,13 @@ class Backend:
                 "camera": self.camera,
                 "last_gesture": self.last_gesture,
                 "presentation_error": self.coordinator.last_error,
+                "camera_message": self.camera_message,
+                # The camera the loop uses or is switching to, during a session.
+                "camera_id": (
+                    self.active_camera["id"]
+                    if self.active_camera and self.camera in ("starting", "ready")
+                    else None
+                ),
             }
 
 
@@ -341,6 +458,17 @@ def create_app(backend: Backend) -> Flask:
         except CalibrationError as exc:
             return jsonify(error=str(exc)), 400
         return jsonify(calibration_fields(calibration))
+
+    @app.get("/api/cameras")
+    def get_cameras():
+        return jsonify(backend.cameras())
+
+    @app.put("/api/cameras")
+    def put_cameras():
+        try:
+            return jsonify(backend.set_camera(request.get_json()))
+        except CameraError as exc:
+            return jsonify(error=str(exc)), 400
 
     return app
 
