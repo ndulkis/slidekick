@@ -69,8 +69,8 @@ function SessionPage() {
 
       <CameraPreview status={status} hasCamera={camera !== 'error'} />
 
-      {/* Reloads on camera changes, so a failed switch shows the camera kept. */}
-      <CameraPicker disabled={camera === 'starting'} refreshKey={camera} />
+      {/* Shows the camera in use, so a failed switch shows the camera kept. */}
+      <CameraPicker disabled={camera === 'starting'} selected={session.cameraId} />
       {session.cameraMessage && (
         <p className="session-message" role="alert">
           {session.cameraMessage}

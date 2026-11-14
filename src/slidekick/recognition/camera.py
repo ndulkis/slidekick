@@ -18,6 +18,7 @@ import subprocess  # nosec B404
 import sys
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 import cv2  # OpenCV for webcam capture and frame processing
 import mediapipe as mp  # MediaPipe for hand detection and tracking
@@ -59,6 +60,10 @@ CAMERA_CAPTURE_FPS = 30
 
 # Maximum number of consecutive failed frame reads before exiting.
 MAX_FAILED_READS = 30
+
+# How long a camera switch waits for the new camera's first frame. The old
+# camera keeps streaming meanwhile, so the preview never freezes.
+SWAP_FRAME_TIMEOUT = 2.5
 
 # Number of missed hand-detection frames tolerated before
 # clearing old movement history to avoid stale swipe data.
@@ -199,16 +204,31 @@ def open_camera(index):
     return camera
 
 
-def swap_camera(camera, index, open_camera=open_camera):
-    """Open camera index before releasing camera, so a failed switch keeps the
-    working one. Returns (camera to use, whether the switch worked).
+def has_frame(camera, timeout=SWAP_FRAME_TIMEOUT):
+    """True once camera delivers a frame. An iPhone opens at once but can
+    take a few seconds to send its first frame.
     """
-    new_camera = open_camera(index)
-    if not new_camera.isOpened():
-        new_camera.release()
-        return camera, False
+    deadline = time.monotonic() + timeout
+    while camera.isOpened() and time.monotonic() < deadline:
+        if camera.read()[0]:
+            return True
+        time.sleep(0.03)
+    return False
+
+
+def open_with_frame(index, open_camera=open_camera, timeout=SWAP_FRAME_TIMEOUT):
+    """Open camera index and wait for its first frame. Returns the camera, or
+    None (already released) if no frame came within timeout. Runs on a helper
+    thread, so the camera in use keeps streaming while this waits.
+    """
+    started = time.monotonic()
+    camera = open_camera(index)
+    if has_frame(camera, timeout):
+        print(f"Camera switched in {time.monotonic() - started:.1f}s")
+        return camera
     camera.release()
-    return new_camera, True
+    print(f"Camera switch failed after {time.monotonic() - started:.1f}s")
+    return None
 
 
 def create_recognizer_options():
@@ -571,6 +591,9 @@ def run_camera(
     camera = open_camera(current["index"] if current else load_settings().camera_index)
     # Set once the open camera was lost, so a failed fallback ends the loop.
     lost = False
+    # A camera switch in progress: (target camera, Future of open_with_frame).
+    switcher = ThreadPoolExecutor(max_workers=1)
+    pending = None
 
     # Configure the MediaPipe Gesture Recognizer.
     options = create_recognizer_options()
@@ -660,14 +683,29 @@ def run_camera(
             if should_stop is not None and should_stop():
                 break
 
-            # Switch cameras when the selection changes mid-session.
+            # Switch cameras when the selection changes mid-session. The new
+            # camera opens on a helper thread while this one keeps streaming.
             wanted = get_camera() if get_camera is not None else None
-            if wanted is not None and (
-                current is None or wanted["id"] != current["id"]
+            if (
+                pending is None
+                and wanted is not None
+                and (current is None or wanted["id"] != current["id"])
             ):
-                camera, switched = swap_camera(camera, wanted["index"])
-                if switched:
-                    current = wanted
+                pending = (wanted, switcher.submit(open_with_frame, wanted["index"]))
+
+            if pending is not None and pending[1].done():
+                target, new_camera = pending[0], pending[1].result()
+                pending = None
+                if new_camera is not None and (
+                    wanted is None or wanted["id"] != target["id"]
+                ):
+                    # The selection changed again meanwhile; the next frame
+                    # starts a switch to the newer choice.
+                    new_camera.release()
+                elif new_camera is not None:
+                    camera.release()
+                    camera = new_camera
+                    current = target
                     lost = False
                     failed_reads = 0
                     # A hand "jumping" between viewpoints must not read
@@ -680,7 +718,13 @@ def run_camera(
                     missed_hand_frames = 0
                     if on_ready is not None:
                         on_ready()
-                elif on_camera_failed is not None:
+                elif (
+                    on_camera_failed is not None
+                    and wanted is not None
+                    and wanted["id"] == target["id"]
+                ):
+                    # Only a failure of the current choice is reported; a
+                    # newer choice gets its own switch on the next frame.
                     on_camera_failed()
 
             # Read the next camera frame.
@@ -694,6 +738,10 @@ def run_camera(
                     # Fall back to another camera once, if there is one.
                     if not lost and on_camera_lost is not None and on_camera_lost():
                         lost = True
+                        failed_reads = 0
+                        continue
+                    # Keep going while the fallback camera is still opening.
+                    if pending is not None:
                         failed_reads = 0
                         continue
                     print("Error: Could not read frame.")
@@ -900,8 +948,12 @@ def run_camera(
     # L. Release camera resources
     # --------------------------------------------------------
 
-    # Release the webcam after the recognition loop exits.
+    # Release the webcam after the recognition loop exits, and any camera a
+    # switch was still opening.
     camera.release()
+    if pending is not None and (opening := pending[1].result()) is not None:
+        opening.release()
+    switcher.shutdown()
 
     # Close all OpenCV windows created by the application.
     if window_name is not None:

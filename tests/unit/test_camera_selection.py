@@ -10,7 +10,11 @@ from slidekick import api_server
 from slidekick.api_server import Backend, create_app
 from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.recognition import camera as camera_module
-from slidekick.recognition.camera import list_cameras, resolve_camera, swap_camera
+from slidekick.recognition.camera import (
+    list_cameras,
+    open_with_frame,
+    resolve_camera,
+)
 from slidekick.session_coordinator import SessionCoordinator
 
 BUILTIN = {"id": "6C70", "name": "MacBook Pro Camera", "index": 1, "phone": False}
@@ -71,25 +75,31 @@ def test_resolve_camera():
 
 
 class FakeCapture:
-    def __init__(self, opened=True):
+    def __init__(self, opened=True, frames=True):
         self.opened = opened
+        self.frames = frames
         self.released = False
 
     def isOpened(self):
         return self.opened
 
+    def read(self):
+        return self.frames, None
+
     def release(self):
         self.released = True
 
 
-@pytest.mark.parametrize("opens", [True, False])
-def test_swap_camera_releases_old_only_on_success(opens):
-    old, new = FakeCapture(), FakeCapture(opened=opens)
-    camera, switched = swap_camera(old, 3, open_camera=lambda index: new)
-    assert switched is opens
-    assert camera is (new if opens else old)
-    assert old.released is opens
-    assert new.released is not opens
+@pytest.mark.parametrize(
+    ("opens", "frames", "works"),
+    [(True, True, True), (False, False, False), (True, False, False)],
+)
+def test_open_with_frame_needs_a_frame(opens, frames, works):
+    # (True, False): opens but never sends a frame, like a sleeping iPhone.
+    new = FakeCapture(opened=opens, frames=frames)
+    camera = open_with_frame(3, open_camera=lambda index: new, timeout=0.1)
+    assert camera is (new if works else None)
+    assert new.released is not works
 
 
 @pytest.fixture
@@ -135,7 +145,9 @@ def test_switch_mid_session_and_revert_on_failure(backend):
     assert backend.get_camera() is BUILTIN
 
     backend.set_camera({"id": "3BA9"})
-    assert backend.camera == "starting"
+    # The old camera keeps streaming while the phone opens.
+    assert backend.camera == "ready"
+    assert backend.status()["camera_id"] == "3BA9"
     assert backend.get_camera() is PHONE
 
     backend.camera_switch_failed()
@@ -148,13 +160,35 @@ def test_switch_mid_session_and_revert_on_failure(backend):
     assert backend.camera_id == "6C70"
 
 
+def test_second_choice_during_a_switch_keeps_the_open_camera(backend, cameras):
+    usb = {"id": "AAAA", "name": "USB Camera", "index": 2, "phone": False}
+    cameras.append(usb)
+    backend.start()
+    backend.camera_ready()
+
+    backend.set_camera({"id": "3BA9"})  # still opening when...
+    backend.set_camera({"id": "AAAA"})  # ...the user picks again
+    backend.camera_switch_failed()
+
+    assert backend.status()["camera_message"] == (
+        "Couldn't switch to USB Camera, still using MacBook Pro Camera."
+    )
+    assert backend.get_camera() is BUILTIN
+
+
+def test_camera_id_is_only_reported_during_a_session(backend):
+    backend.set_camera({"id": "3BA9"})
+    assert backend.status()["camera_id"] is None
+    backend.start()
+    assert backend.status()["camera_id"] == "3BA9"
+
+
 def test_lost_camera_falls_back_to_another(backend, cameras):
     backend.camera_id = "3BA9"
     backend.start()
     backend.camera_ready()
     assert backend.camera_lost()
     assert backend.get_camera() is BUILTIN
-    assert backend.camera == "starting"
     # The choice is kept for the next session, when the phone may be back.
     assert backend.camera_id == "3BA9"
 

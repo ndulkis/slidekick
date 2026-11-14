@@ -6,12 +6,12 @@ type CamerasBody = { cameras: Camera[]; selected: string | null }
 
 interface CameraPickerProps {
   disabled?: boolean
-  /** The list and selection reload whenever this changes. */
-  refreshKey?: unknown
+  /** The camera in use during a session. Without it, the saved choice. */
+  selected?: string | null
 }
 
 /** Chooses the camera SlideKick uses. Works during a session too. */
-function CameraPicker({ disabled = false, refreshKey }: CameraPickerProps) {
+function CameraPicker({ disabled = false, selected }: CameraPickerProps) {
   const [cameras, setCameras] = useState<CamerasBody | null>(null)
   const [error, setError] = useState(false)
 
@@ -27,7 +27,7 @@ function CameraPicker({ disabled = false, refreshKey }: CameraPickerProps) {
     return () => {
       cancelled = true
     }
-  }, [refreshKey])
+  }, [])
 
   if (!cameras?.cameras.length) return null
 
@@ -48,7 +48,7 @@ function CameraPicker({ disabled = false, refreshKey }: CameraPickerProps) {
         <label>
           Camera{' '}
           <select
-            value={cameras.selected ?? ''}
+            value={(selected || cameras.selected) ?? ''}
             disabled={disabled}
             onChange={(e) => void handleChange(e.target.value)}
           >

@@ -58,6 +58,7 @@ function status() {
     last_gesture: fakeBackend.lastGesture,
     presentation_error: fakeBackend.presentationError,
     camera_message: fakeBackend.cameraMessage,
+    camera_id: fakeBackend.camera === 'off' ? null : fakeBackend.selectedCamera,
   }
 }
 

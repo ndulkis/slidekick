@@ -143,6 +143,7 @@ class Backend:
             # A missing camera (phone out of range) falls back to the
             # built-in one rather than failing the session.
             self.active_camera = resolve_camera(list_cameras(), self.camera_id)
+            self._switching_from = None
             self.camera_message = None
             if self.camera != "ready":
                 self.camera = "starting"
@@ -220,7 +221,9 @@ class Backend:
             self.quit()
 
     def camera_ready(self) -> None:
+        """The camera opened, at session start or after a switch."""
         self.camera = "ready"
+        self._switching_from = None
 
     def set_frame(self, jpeg: bytes) -> None:
         with self._frame_ready:
@@ -276,10 +279,11 @@ class Backend:
         if self.camera in ("starting", "ready") and self.active_camera is not None:
             if camera["id"] == self.active_camera["id"]:
                 return
-            self._switching_from = self.active_camera
-            # The dashboard shows "Starting camera..." until the loop calls
-            # camera_ready (switched) or camera_switch_failed.
-            self.camera = "starting"
+            # The camera the loop has open, which keeps streaming until the
+            # loop calls camera_ready (switched) or camera_switch_failed. A
+            # second choice during a switch must not replace it.
+            if self._switching_from is None:
+                self._switching_from = self.active_camera
         self.active_camera = camera
 
     def cameras(self) -> dict[str, Any]:
@@ -316,6 +320,7 @@ class Backend:
                 f"Couldn't switch to {failed['name']}, still using {working['name']}."
             )
             self.active_camera = working
+            self._switching_from = None
             self._save_camera_id(working["id"])
             self.camera = "ready"
 
@@ -353,6 +358,12 @@ class Backend:
                 "last_gesture": self.last_gesture,
                 "presentation_error": self.coordinator.last_error,
                 "camera_message": self.camera_message,
+                # The camera the loop uses or is switching to, during a session.
+                "camera_id": (
+                    self.active_camera["id"]
+                    if self.active_camera and self.camera in ("starting", "ready")
+                    else None
+                ),
             }
 
 
