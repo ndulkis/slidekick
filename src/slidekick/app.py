@@ -115,7 +115,11 @@ def main():
     # Default bindings: swipes only. "end" is not bindable by policy
     # (command_policy.py), so no gesture can close the slideshow.
     session = SessionCoordinator(gestures=GestureCommandController())
-    backend = Backend(session, calibration_path=REPO_ROOT / "data/calibration.json")
+    backend = Backend(
+        session,
+        calibration_path=REPO_ROOT / "data/calibration.json",
+        camera_path=REPO_ROOT / "data/camera.json",
+    )
     serve_in_background(backend)
     print(f"Dashboard API: http://127.0.0.1:{API_PORT}/api/session")
 
@@ -158,6 +162,9 @@ def run_one_session(backend: Backend) -> None:
             on_ready=backend.camera_ready,
             should_stop=backend.should_stop_camera,
             on_frame=backend.set_frame,
+            get_camera=backend.get_camera,
+            on_camera_failed=backend.camera_switch_failed,
+            on_camera_lost=backend.camera_lost,
         )
     finally:
         backend.camera_stopped()

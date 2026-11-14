@@ -19,6 +19,7 @@ function renderSession() {
 async function renderReadySession() {
   const user = renderSession()
   await screen.findByText('Ready')
+  await screen.findByRole('combobox', { name: 'Camera' })
   return user
 }
 
@@ -38,6 +39,8 @@ describe('Session keyboard use (TC-08)', () => {
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveFocus()
     await user.tab()
     expect(screen.getByRole('button', { name: 'Quit SlideKick' })).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('combobox', { name: 'Camera' })).toHaveFocus()
     // End and Pause are disabled at Ready, so Start is the next stop.
     await user.tab()
     expect(button('Start session')).toHaveFocus()
@@ -74,8 +77,8 @@ describe('Session keyboard use (TC-08)', () => {
     button('Pause session').focus()
     await user.keyboard(' ')
 
-    // From the header's last control, Tab skips the disabled Start and End buttons.
-    button('Quit SlideKick').focus()
+    // From the camera picker, Tab skips the disabled Start and End buttons.
+    screen.getByRole('combobox', { name: 'Camera' }).focus()
     await user.tab()
 
     expect(button('Resume session')).toHaveFocus()

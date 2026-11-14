@@ -13,12 +13,16 @@ Responsibilities:
 # 1. IMPORTS
 # ============================================================
 
+import json
+import subprocess  # nosec B404
+import sys
 import time
 from collections import deque
 
 import cv2  # OpenCV for webcam capture and frame processing
 import mediapipe as mp  # MediaPipe for hand detection and tracking
 
+from ..config import load_settings
 from .events import create_gesture_event, create_landmark_event
 from .gesture_arbitration import (
     GestureArbitrationState,
@@ -123,6 +127,88 @@ def create_camera_window():
     cv2.resizeWindow(window_name, WINDOW_WIDTH, WINDOW_HEIGHT)
 
     return window_name
+
+
+# OpenCV capture backend for each SLIDEKICK_CAMERA_BACKEND value.
+CAPTURE_BACKENDS = {
+    "avfoundation": cv2.CAP_AVFOUNDATION,
+    "msmf": cv2.CAP_MSMF,
+    "dshow": cv2.CAP_DSHOW,
+    "v4l2": cv2.CAP_V4L2,
+    "any": cv2.CAP_ANY,
+}
+
+
+def list_cameras():
+    """The cameras OpenCV can open, as dicts with id, name, index and phone.
+
+    Only macOS can list devices without a new dependency. Elsewhere there is
+    one entry, the camera chosen by SLIDEKICK_CAMERA_INDEX.
+    """
+    default = {
+        "id": "default",
+        "name": "Default camera",
+        "index": load_settings().camera_index,
+        "phone": False,
+    }
+    if sys.platform != "darwin":
+        return [default]
+    try:
+        # Fixed argument list, no shell, no user input.
+        output = subprocess.run(  # nosec B603 B607
+            ["system_profiler", "SPCameraDataType", "-json"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout
+        devices = json.loads(output)["SPCameraDataType"]
+        # ponytail: OpenCV's AVFoundation backend numbers cameras sorted by
+        # unique ID. If a release changes that, use AVFoundation directly.
+        devices = sorted(devices, key=lambda d: d["spcamera_unique-id"])
+        return [
+            {
+                "id": device["spcamera_unique-id"],
+                "name": device["_name"],
+                "index": index,
+                # Continuity Camera reports the iPhone model, like "iPhone16,2".
+                "phone": device.get("spcamera_model-id", "").startswith("iPhone"),
+            }
+            for index, device in enumerate(devices)
+        ]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return [default]
+
+
+def resolve_camera(cameras, camera_id):
+    """The camera with camera_id, else the first one that is not a phone,
+    else the first one. None when there are no cameras.
+    """
+    for camera in cameras:
+        if camera["id"] == camera_id:
+            return camera
+    return next((c for c in cameras if not c["phone"]), cameras[0] if cameras else None)
+
+
+def open_camera(index):
+    """Open a capture device with the configured backend and resolution."""
+    camera = cv2.VideoCapture(index, CAPTURE_BACKENDS[load_settings().camera_backend])
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_CAPTURE_WIDTH)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_CAPTURE_HEIGHT)
+    camera.set(cv2.CAP_PROP_FPS, CAMERA_CAPTURE_FPS)
+    return camera
+
+
+def swap_camera(camera, index, open_camera=open_camera):
+    """Open camera index before releasing camera, so a failed switch keeps the
+    working one. Returns (camera to use, whether the switch worked).
+    """
+    new_camera = open_camera(index)
+    if not new_camera.isOpened():
+        new_camera.release()
+        return camera, False
+    camera.release()
+    return new_camera, True
 
 
 def create_recognizer_options():
@@ -428,6 +514,9 @@ def run_camera(
     on_ready=None,
     should_stop=None,
     on_frame=None,
+    get_camera=None,
+    on_camera_failed=None,
+    on_camera_lost=None,
 ):
     """Run the SlideKick camera and gesture recognition loop.
 
@@ -457,6 +546,20 @@ def run_camera(
         should_stop:
             Optional callable checked every frame. The loop exits and
             releases the camera when it returns True.
+
+        get_camera:
+            Optional callable returning the camera to use, a list_cameras()
+            entry. Read every frame: when its id changes, the loop switches
+            to it. Without it, SLIDEKICK_CAMERA_INDEX is used.
+
+        on_camera_failed:
+            Called when switching cameras fails. The old camera stays open.
+            A successful switch calls on_ready again.
+
+        on_camera_lost:
+            Called when the open camera stops sending frames. Return True
+            after pointing get_camera at another camera to switch to it;
+            otherwise the loop ends.
     """
 
     # --------------------------------------------------------
@@ -464,13 +567,10 @@ def run_camera(
     # --------------------------------------------------------
     window_name = create_camera_window() if on_frame is None else None
 
-    # Camera index 0 selects the computer's default webcam.
-    camera = cv2.VideoCapture(0)
-
-    # Request the capture resolution and frame rate.
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_CAPTURE_WIDTH)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_CAPTURE_HEIGHT)
-    camera.set(cv2.CAP_PROP_FPS, CAMERA_CAPTURE_FPS)
+    current = get_camera() if get_camera is not None else None
+    camera = open_camera(current["index"] if current else load_settings().camera_index)
+    # Set once the open camera was lost, so a failed fallback ends the loop.
+    lost = False
 
     # Configure the MediaPipe Gesture Recognizer.
     options = create_recognizer_options()
@@ -560,6 +660,29 @@ def run_camera(
             if should_stop is not None and should_stop():
                 break
 
+            # Switch cameras when the selection changes mid-session.
+            wanted = get_camera() if get_camera is not None else None
+            if wanted is not None and (
+                current is None or wanted["id"] != current["id"]
+            ):
+                camera, switched = swap_camera(camera, wanted["index"])
+                if switched:
+                    current = wanted
+                    lost = False
+                    failed_reads = 0
+                    # A hand "jumping" between viewpoints must not read
+                    # as a swipe, so start recognition over.
+                    position_history.clear()
+                    gesture_state = GestureRecognitionState()
+                    static_state = StaticGestureState()
+                    motion_state = GestureArbitrationState()
+                    arbitration_state = SwipeStaticArbitrationState()
+                    missed_hand_frames = 0
+                    if on_ready is not None:
+                        on_ready()
+                elif on_camera_failed is not None:
+                    on_camera_failed()
+
             # Read the next camera frame.
             success, frame = camera.read()
 
@@ -568,6 +691,11 @@ def run_camera(
 
                 # Give up after too many failed reads in a row.
                 if failed_reads >= MAX_FAILED_READS:
+                    # Fall back to another camera once, if there is one.
+                    if not lost and on_camera_lost is not None and on_camera_lost():
+                        lost = True
+                        failed_reads = 0
+                        continue
                     print("Error: Could not read frame.")
                     break
 

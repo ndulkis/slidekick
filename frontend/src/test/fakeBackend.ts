@@ -25,6 +25,14 @@ function initial() {
     calibration: toBackend(DEFAULT_CALIBRATION) as Record<string, number>,
     /** When set, PUT /api/calibration answers 400. */
     rejectCalibration: false,
+    cameras: [
+      { id: 'builtin', name: 'MacBook Pro Camera' },
+      { id: 'phone', name: 'iPhone Camera' },
+    ],
+    selectedCamera: 'builtin',
+    /** When set, PUT /api/cameras keeps the camera and reports why. */
+    failCameraSwitch: false,
+    cameraMessage: null as string | null,
     /** Set by POST /api/quit. */
     hasQuit: false,
     gestureId: 0,
@@ -49,6 +57,7 @@ function status() {
     camera: fakeBackend.camera,
     last_gesture: fakeBackend.lastGesture,
     presentation_error: fakeBackend.presentationError,
+    camera_message: fakeBackend.cameraMessage,
   }
 }
 
@@ -97,6 +106,24 @@ export function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise
       if (fakeBackend.rejectCalibration) return json({ error: 'Invalid calibration' }, 400)
       fakeBackend.calibration = JSON.parse(String(init?.body))
       return json(fakeBackend.calibration)
+    }
+  }
+
+  if (path === '/api/cameras') {
+    const cameras = () => ({ cameras: fakeBackend.cameras, selected: fakeBackend.selectedCamera })
+    if (method === 'GET') return json(cameras())
+    if (method === 'PUT') {
+      const { id } = JSON.parse(String(init?.body)) as { id: string }
+      const target = fakeBackend.cameras.find((c) => c.id === id)
+      if (!target) return json({ error: 'Unknown camera' }, 400)
+      const current = fakeBackend.cameras.find((c) => c.id === fakeBackend.selectedCamera)
+      if (fakeBackend.failCameraSwitch) {
+        fakeBackend.cameraMessage = `Couldn't switch to ${target.name}, still using ${current?.name}.`
+      } else {
+        fakeBackend.selectedCamera = id
+        fakeBackend.cameraMessage = null
+      }
+      return json(cameras())
     }
   }
 

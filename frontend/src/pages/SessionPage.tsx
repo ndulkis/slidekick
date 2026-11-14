@@ -1,4 +1,5 @@
 import { useSession } from '../core/useSession'
+import CameraPicker from '../settings/CameraPicker'
 import CameraPreview from '../session/CameraPreview'
 import GestureFeedback from '../session/GestureFeedback'
 import GestureFeedbackToast from '../session/GestureFeedbackToast'
@@ -67,6 +68,14 @@ function SessionPage() {
       )}
 
       <CameraPreview status={status} hasCamera={camera !== 'error'} />
+
+      {/* Reloads on camera changes, so a failed switch shows the camera kept. */}
+      <CameraPicker disabled={camera === 'starting'} refreshKey={camera} />
+      {session.cameraMessage && (
+        <p className="session-message" role="alert">
+          {session.cameraMessage}
+        </p>
+      )}
 
       <GestureFeedback status={status} event={visibleEvent} />
 

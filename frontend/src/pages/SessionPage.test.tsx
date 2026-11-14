@@ -163,6 +163,29 @@ describe('SessionPage', () => {
     expect(button('End session')).toBeEnabled()
   })
 
+  it('switches cameras during a session and shows a failed switch', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+
+    const picker = await screen.findByRole('combobox', { name: 'Camera' })
+    fireEvent.change(picker, { target: { value: 'phone' } })
+    await waitFor(() => expect(fakeBackend.selectedCamera).toBe('phone'))
+
+    fakeBackend.failCameraSwitch = true
+    fireEvent.change(picker, { target: { value: 'builtin' } })
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't switch to MacBook Pro Camera, still using iPhone Camera.",
+    )
+    expect(picker).toHaveValue('phone')
+  })
+
+  it('disables the camera picker while the camera starts', async () => {
+    fakeBackend.cameraOnStart = 'starting'
+    await renderPage()
+    await click('Start session', 'Session starting')
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Camera' })).toBeDisabled())
+  })
+
   it('disables session controls during an error and recovers', async () => {
     fakeBackend.online = false
     await renderPage('Error')
