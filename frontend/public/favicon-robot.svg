@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="22 22 116 116" role="img" aria-label="SlideKick">
+<title>SlideKick</title>
+<style>
+.bob{animation:bob 1.6s ease-in-out infinite alternate}
+@keyframes bob{from{transform:translateY(-2px)}to{transform:translateY(2px)}}
+.look{animation:look 6s ease-in-out infinite}
+@keyframes look{0%,35%,100%{transform:translateX(0)}42%,55%{transform:translateX(-4px)}62%,75%{transform:translateX(4px)}}
+.blink{transform-box:fill-box;transform-origin:center;animation:blink 4s infinite}
+@keyframes blink{0%,90%,96%,100%{transform:scaleY(1)}93%{transform:scaleY(.1)}}
+.ring{animation:dash 2.4s linear infinite}.ring2{animation:dash2 3.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-180}}@keyframes dash2{to{stroke-dashoffset:100}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+  <g transform="translate(0 0)">
+    <ellipse cx="34" cy="80" rx="8" ry="15" fill="#fff" stroke="#001a4d" stroke-width="3"/>
+    <ellipse cx="126" cy="80" rx="8" ry="15" fill="#fff" stroke="#001a4d" stroke-width="3"/>
+    <rect x="38" y="48" width="84" height="64" rx="28" fill="#08f" stroke="#001a4d" stroke-width="3.5"/>
+    <rect x="49" y="58" width="62" height="44" rx="16" fill="#070b19" stroke="#001a4d" stroke-width="3"/>
+    <g class="look"><g class="blink">
+      <ellipse cx="67" cy="76" rx="6" ry="9" fill="#fe0"/>
+      <ellipse cx="93" cy="76" rx="6" ry="9" fill="#fe0"/>
+    </g></g>
+    <path class="mouth" d="M74 89Q80 91 86 89C86 96 74 96 74 89Z" fill="#f70"/>
+  </g>
+</svg>
