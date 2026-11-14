@@ -29,7 +29,8 @@ function CameraPicker({ disabled = false, selected }: CameraPickerProps) {
     }
   }, [])
 
-  if (!cameras?.cameras.length) return null
+  // Nothing to choose with one camera, e.g. Linux, which lists only the default.
+  if (!cameras || cameras.cameras.length < 2) return null
 
   async function handleChange(id: string) {
     setError(false)

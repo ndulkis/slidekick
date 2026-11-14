@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { fakeBackend } from '../test/fakeBackend'
 import SessionPage from './SessionPage'
 
@@ -177,6 +177,21 @@ describe('SessionPage', () => {
       "Couldn't switch to MacBook Pro Camera, still using iPhone Camera.",
     )
     expect(picker).toHaveValue('phone')
+  })
+
+  it('hides the camera picker when there is only one camera', async () => {
+    fakeBackend.cameras = [{ id: 'default', name: 'Default camera' }]
+    await renderPage()
+    await waitFor(() => expect(screen.queryByRole('combobox', { name: 'Camera' })).toBeNull())
+  })
+
+  it('gives Windows camera privacy advice when the camera fails', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Windows NT 10.0)')
+    fakeBackend.state = 'ended'
+    fakeBackend.camera = 'error'
+    await renderPage('Ended')
+    expect(screen.getByRole('alert')).toHaveTextContent('Let desktop apps access your camera')
+    vi.restoreAllMocks()
   })
 
   it('disables the camera picker while the camera starts', async () => {

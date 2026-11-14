@@ -145,54 +145,94 @@ CAPTURE_BACKENDS = {
 
 
 def list_cameras():
-    """The cameras OpenCV can open, as dicts with id, name, index and phone.
+    """The cameras OpenCV can open, as dicts with id (stable across reconnects),
+    name, index (OpenCV's number for it) and avoid (a phone or virtual camera,
+    only chosen by default when there is nothing else).
 
-    Only macOS can list devices without a new dependency. Elsewhere there is
-    one entry, the camera chosen by SLIDEKICK_CAMERA_INDEX.
+    macOS and Windows list their devices. Elsewhere, or if listing fails, there
+    is one entry: the camera chosen by SLIDEKICK_CAMERA_INDEX.
     """
+    settings = load_settings()
     default = {
         "id": "default",
         "name": "Default camera",
-        "index": load_settings().camera_index,
-        "phone": False,
+        "index": settings.camera_index,
+        "avoid": False,
     }
-    if sys.platform != "darwin":
-        return [default]
     try:
-        # Fixed argument list, no shell, no user input.
-        output = subprocess.run(  # nosec B603 B607
-            ["system_profiler", "SPCameraDataType", "-json"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=True,
-        ).stdout
-        devices = json.loads(output)["SPCameraDataType"]
-        # ponytail: OpenCV's AVFoundation backend numbers cameras sorted by
-        # unique ID. If a release changes that, use AVFoundation directly.
-        devices = sorted(devices, key=lambda d: d["spcamera_unique-id"])
-        return [
-            {
-                "id": device["spcamera_unique-id"],
-                "name": device["_name"],
-                "index": index,
-                # Continuity Camera reports the iPhone model, like "iPhone16,2".
-                "phone": device.get("spcamera_model-id", "").startswith("iPhone"),
-            }
-            for index, device in enumerate(devices)
-        ]
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
-        return [default]
+        if sys.platform == "darwin":
+            return macos_cameras() or [default]
+        if sys.platform == "win32":
+            return windows_cameras(settings.camera_backend) or [default]
+    except (
+        OSError,
+        subprocess.SubprocessError,
+        ValueError,
+        KeyError,
+        TypeError,
+        ImportError,
+    ):
+        pass
+    return [default]
+
+
+def macos_cameras():
+    """Cameras from system_profiler, which is built into macOS."""
+    # Fixed argument list, no shell, no user input.
+    output = subprocess.run(  # nosec B603 B607
+        ["system_profiler", "SPCameraDataType", "-json"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=True,
+    ).stdout
+    devices = json.loads(output)["SPCameraDataType"]
+    # OpenCV's AVFoundation backend numbers cameras sorted by unique ID
+    # (cv2_enumerate_cameras relies on the same order).
+    devices = sorted(devices, key=lambda d: d["spcamera_unique-id"])
+    return [
+        {
+            "id": device["spcamera_unique-id"],
+            "name": device["_name"],
+            "index": index,
+            # Continuity Camera reports the iPhone model, like "iPhone16,2".
+            "avoid": device.get("spcamera_model-id", "").startswith("iPhone"),
+        }
+        for index, device in enumerate(devices)
+    ]
+
+
+def windows_cameras(backend):
+    """Cameras from cv2_enumerate_cameras, numbered by the same Windows camera
+    API that open_camera uses ("any" makes OpenCV try Media Foundation first).
+    """
+    from cv2_enumerate_cameras import enumerate_cameras
+
+    api = cv2.CAP_DSHOW if backend == "dshow" else cv2.CAP_MSMF
+    return [
+        {
+            # The device path survives replugging; the index does not.
+            "id": camera.path or camera.name,
+            "name": camera.name,
+            "index": camera.index,
+            # ponytail: no USB vendor ID means a virtual camera (OBS, Phone
+            # Link, Teams), but also some built-in laptop cameras that aren't
+            # on USB. Those only lose to a USB camera; match names if that
+            # picks the wrong default in practice.
+            "avoid": camera.vid is None,
+        }
+        for camera in enumerate_cameras(api)
+    ]
 
 
 def resolve_camera(cameras, camera_id):
-    """The camera with camera_id, else the first one that is not a phone,
-    else the first one. None when there are no cameras.
+    """The camera with camera_id, else the first one not to avoid, else the
+    first one. None when there are no cameras.
     """
     for camera in cameras:
         if camera["id"] == camera_id:
             return camera
-    return next((c for c in cameras if not c["phone"]), cameras[0] if cameras else None)
+    return next((c for c in cameras if not c["avoid"]), cameras[0] if cameras else None)
 
 
 def open_camera(index):

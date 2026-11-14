@@ -62,8 +62,11 @@ function SessionPage() {
 
       {camera === 'error' && (
         <p className="session-message" role="alert">
-          The camera couldn't start. Check camera access for the terminal running SlideKick,
-          then start a new session.
+          The camera couldn't start.{' '}
+          {navigator.userAgent.includes('Windows')
+            ? 'Turn on "Let desktop apps access your camera" in Settings > Privacy & security > Camera'
+            : 'Check camera access for the terminal running SlideKick'}
+          , then start a new session.
         </p>
       )}
 

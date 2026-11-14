@@ -2,8 +2,10 @@
 
 import json
 import subprocess
+import sys
 from types import SimpleNamespace
 
+import cv2
 import pytest
 
 from slidekick import api_server
@@ -17,8 +19,8 @@ from slidekick.recognition.camera import (
 )
 from slidekick.session_coordinator import SessionCoordinator
 
-BUILTIN = {"id": "6C70", "name": "MacBook Pro Camera", "index": 1, "phone": False}
-PHONE = {"id": "3BA9", "name": "iPhone Camera", "index": 0, "phone": True}
+BUILTIN = {"id": "6C70", "name": "MacBook Pro Camera", "index": 1, "avoid": False}
+PHONE = {"id": "3BA9", "name": "iPhone Camera", "index": 0, "avoid": True}
 
 PROFILER = {
     "SPCameraDataType": [
@@ -44,12 +46,12 @@ def test_list_cameras_numbers_by_unique_id_like_opencv(monkeypatch):
         lambda *a, **k: SimpleNamespace(stdout=json.dumps(PROFILER)),
     )
     assert list_cameras() == [
-        {"id": "3BA945EE-C94B", "name": "iPhone Camera", "index": 0, "phone": True},
+        {"id": "3BA945EE-C94B", "name": "iPhone Camera", "index": 0, "avoid": True},
         {
             "id": "6C707041-05AC",
             "name": "MacBook Pro Camera",
             "index": 1,
-            "phone": False,
+            "avoid": False,
         },
     ]
 
@@ -61,6 +63,47 @@ def test_list_cameras_falls_back_to_one_default(monkeypatch):
         raise subprocess.CalledProcessError(1, "system_profiler")
 
     monkeypatch.setattr(subprocess, "run", fail)
+    assert [c["id"] for c in list_cameras()] == ["default"]
+
+
+def test_windows_cameras_use_device_paths_and_avoid_virtual_ones(monkeypatch):
+    monkeypatch.setattr(camera_module.sys, "platform", "win32")
+    apis = []
+
+    def enumerate_cameras(api):
+        apis.append(api)
+        return [
+            SimpleNamespace(index=0, name="OBS Virtual Camera", path="", vid=None),
+            SimpleNamespace(
+                index=1, name="Integrated Webcam", path=r"\\?\usb#vid_0c45", vid=0x0C45
+            ),
+        ]
+
+    module = SimpleNamespace(enumerate_cameras=enumerate_cameras)
+    monkeypatch.setitem(sys.modules, "cv2_enumerate_cameras", module)
+
+    cameras = list_cameras()
+    assert apis == [cv2.CAP_MSMF]
+    assert cameras == [
+        {
+            "id": "OBS Virtual Camera",
+            "name": "OBS Virtual Camera",
+            "index": 0,
+            "avoid": True,
+        },
+        {
+            "id": r"\\?\usb#vid_0c45",
+            "name": "Integrated Webcam",
+            "index": 1,
+            "avoid": False,
+        },
+    ]
+    assert resolve_camera(cameras, None)["name"] == "Integrated Webcam"
+
+
+def test_windows_without_the_package_lists_the_default(monkeypatch):
+    monkeypatch.setattr(camera_module.sys, "platform", "win32")
+    monkeypatch.setitem(sys.modules, "cv2_enumerate_cameras", None)  # import fails
     assert [c["id"] for c in list_cameras()] == ["default"]
 
 
@@ -161,7 +204,7 @@ def test_switch_mid_session_and_revert_on_failure(backend):
 
 
 def test_second_choice_during_a_switch_keeps_the_open_camera(backend, cameras):
-    usb = {"id": "AAAA", "name": "USB Camera", "index": 2, "phone": False}
+    usb = {"id": "AAAA", "name": "USB Camera", "index": 2, "avoid": False}
     cameras.append(usb)
     backend.start()
     backend.camera_ready()
