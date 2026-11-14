@@ -22,6 +22,7 @@ git clone git@github.com:ndulkis/slidekick.git && cd slidekick
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.lock
+pip install -e .
 npm --prefix frontend ci
 ./scripts/verify.sh
 ```
@@ -33,8 +34,9 @@ git clone git@github.com:ndulkis/slidekick.git; cd slidekick
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.lock
+pip install -e .
 npm --prefix frontend ci
-$env:PYTHONPATH = "src"; python scripts/check_env.py
+python scripts/check_env.py
 ```
 
 - Activate `.venv` in every new terminal.
@@ -44,18 +46,18 @@ $env:PYTHONPATH = "src"; python scripts/check_env.py
 
 ## Commands
 
-Run from the repo root with `.venv` active. On Windows, set `$env:PYTHONPATH = "src"` instead of the `PYTHONPATH=src` prefix.
+Run from the repo root with `.venv` active. `slidekick` works from any folder.
 
 | Command | What it does |
 | --- | --- |
-| `PYTHONPATH=src python scripts/run_gesture_control.py` | Run SlideKick: webcam gestures control the focused presentation |
-| `PYTHONPATH=src python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
-| `PYTHONPATH=src python scripts/check_env.py` | Check the dev environment and print fixes |
+| `slidekick` | Run SlideKick: the dashboard opens in its own Chrome or Edge window (a browser tab at `localhost:5173/session` if neither is installed; API on `127.0.0.1:5001`). Start a session there to turn on the camera and gesture control. Quit with the dashboard's Quit SlideKick button, by closing that window, or with Ctrl+C in the terminal |
+| `python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
+| `python scripts/check_env.py` | Check the dev environment and print fixes |
 | `./scripts/verify.sh` | Run the environment check plus the main CI checks |
 | `./scripts/checks/<name>.sh` | Run one CI check on its own, e.g. `./scripts/checks/unit-tests.sh` (see `scripts/checks/` for the list) |
 | `python -m pytest` | Run all Python tests |
 | `ruff check .` / `ruff format .` | Lint / format Python |
-| `npm --prefix frontend run dev` | Dashboard dev server on port 5173 |
+| `npm --prefix frontend run dev` | Dashboard dev server only, without the backend (it shows "Can't reach SlideKick") |
 | `npm --prefix frontend run test` / `run lint` | Frontend tests / lint |
 | `python manual_test.py` | Press "next slide" once after 3 seconds, to check slide control |
 

@@ -1,17 +1,12 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import CalibrationSlider from './CalibrationSlider'
-import type { CalibrationKey, CalibrationStorage } from './calibrationSettings'
+import type { CalibrationKey } from './calibrationSettings'
 import {
   CALIBRATION_CONTROLS,
-  loadCalibration,
-  resetCalibration,
+  DEFAULT_CALIBRATION,
+  fetchCalibration,
   saveCalibration,
 } from './calibrationSettings'
-
-interface GestureCalibrationSectionProps {
-  /** Overrides browser storage; used by tests. */
-  storage?: CalibrationStorage
-}
 
 type SaveStatus = 'saved' | 'reset' | 'error' | null
 
@@ -20,36 +15,55 @@ const statusMessages: Record<'saved' | 'reset', string> = {
   reset: 'Calibration reset to defaults.',
 }
 
-function GestureCalibrationSection({ storage }: GestureCalibrationSectionProps) {
+function GestureCalibrationSection() {
   const headingId = useId()
-  const [settings, setSettings] = useState(() => loadCalibration(storage))
+  const [settings, setSettings] = useState(DEFAULT_CALIBRATION)
+  const [offline, setOffline] = useState(false)
   const [status, setStatus] = useState<SaveStatus>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchCalibration().then((loaded) => {
+      if (cancelled) return
+      if (loaded) setSettings(loaded)
+      setOffline(!loaded)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function handleChange(key: CalibrationKey, value: number) {
     setSettings((current) => ({ ...current, [key]: value }))
     setStatus(null)
   }
 
-  function handleSave() {
-    setStatus(saveCalibration(settings, storage) ? 'saved' : 'error')
+  async function handleSave() {
+    setStatus((await saveCalibration(settings)) ? 'saved' : 'error')
   }
 
-  function handleReset() {
-    setSettings(resetCalibration(storage))
-    setStatus('reset')
+  async function handleReset() {
+    if (await saveCalibration(DEFAULT_CALIBRATION)) {
+      setSettings(DEFAULT_CALIBRATION)
+      setStatus('reset')
+    } else {
+      setStatus('error')
+    }
   }
 
   return (
     <section className="calibration-section" aria-labelledby={headingId}>
       <h2 id={headingId}>Gesture Calibration</h2>
       <p className="calibration-intro">
-        Adjust how SlideKick recognizes your swipes. Your settings are saved in
-        this browser.
+        Adjust how SlideKick recognizes your swipes. Saved settings apply right
+        away, even during a session.
       </p>
-      <p className="calibration-note">
-        Note: these settings aren't applied to gesture recognition yet. They'll
-        take effect once SlideKick's recognition is connected to this app.
-      </p>
+      {offline && (
+        <p className="calibration-note">
+          Can't reach SlideKick, so these are the default settings. Start
+          SlideKick to load and save your calibration.
+        </p>
+      )}
 
       {CALIBRATION_CONTROLS.map((control) => (
         <CalibrationSlider

@@ -1,39 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { fakeBackend } from '../test/fakeBackend'
 import {
   CALIBRATION_CONTROLS,
-  CALIBRATION_STORAGE_KEY,
   DEFAULT_CALIBRATION,
-  loadCalibration,
-  resetCalibration,
+  fetchCalibration,
+  fromBackend,
   saveCalibration,
+  toBackend,
 } from './calibrationSettings'
-
-function memoryStorage(initial: Record<string, string> = {}) {
-  const data = new Map(Object.entries(initial))
-  return {
-    getItem: (key: string) => data.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      data.set(key, value)
-    },
-    removeItem: (key: string) => {
-      data.delete(key)
-    },
-  }
-}
-
-function failingStorage() {
-  return {
-    getItem: () => {
-      throw new Error('blocked')
-    },
-    setItem: () => {
-      throw new Error('quota exceeded')
-    },
-    removeItem: () => {
-      throw new Error('blocked')
-    },
-  }
-}
 
 describe('calibrationSettings', () => {
   it('uses the backend GestureCalibration defaults', () => {
@@ -53,47 +27,41 @@ describe('calibrationSettings', () => {
     }
   })
 
-  it('returns the defaults when nothing is saved', () => {
-    expect(loadCalibration(memoryStorage())).toEqual(DEFAULT_CALIBRATION)
+  it('converts to and from the backend field names', () => {
+    const backend = toBackend(DEFAULT_CALIBRATION)
+    expect(backend).toEqual({
+      min_displacement: 0.1,
+      max_swipe_duration: 1.75,
+      confidence_threshold: 0.55,
+      swipe_cooldown: 1.5,
+    })
+    expect(fromBackend(backend)).toEqual(DEFAULT_CALIBRATION)
   })
 
-  it('loads a saved profile', () => {
-    const storage = memoryStorage()
+  it('rejects backend values that are missing or out of range', () => {
+    expect(fromBackend({ ...toBackend(DEFAULT_CALIBRATION), swipe_cooldown: 99 })).toBeUndefined()
+    expect(fromBackend({ min_displacement: 0.1 })).toBeUndefined()
+    expect(fromBackend(null)).toBeUndefined()
+  })
+
+  it('loads and saves through the API', async () => {
     const profile = { swipeDistance: 0.15, swipeDuration: 2.5, strictness: 0.7, cooldown: 1 }
 
-    expect(saveCalibration(profile, storage)).toBe(true)
-    expect(loadCalibration(storage)).toEqual(profile)
+    expect(await saveCalibration(profile)).toBe(true)
+    expect(await fetchCalibration()).toEqual(profile)
   })
 
-  it('falls back to the defaults for corrupt data', () => {
-    const storage = memoryStorage({ [CALIBRATION_STORAGE_KEY]: 'not json' })
-    expect(loadCalibration(storage)).toEqual(DEFAULT_CALIBRATION)
+  it('refuses to send an invalid profile', async () => {
+    expect(await saveCalibration({ ...DEFAULT_CALIBRATION, cooldown: -1 })).toBe(false)
+    expect(fakeBackend.calibration.swipe_cooldown).toBe(DEFAULT_CALIBRATION.cooldown)
   })
 
-  it('falls back to the defaults for out-of-range values', () => {
-    const storage = memoryStorage({
-      [CALIBRATION_STORAGE_KEY]: JSON.stringify({ ...DEFAULT_CALIBRATION, strictness: 2 }),
-    })
-    expect(loadCalibration(storage)).toEqual(DEFAULT_CALIBRATION)
-  })
+  it('reports failure when SlideKick refuses or is unreachable', async () => {
+    fakeBackend.rejectCalibration = true
+    expect(await saveCalibration(DEFAULT_CALIBRATION)).toBe(false)
 
-  it('refuses to save an invalid profile', () => {
-    const storage = memoryStorage()
-    expect(saveCalibration({ ...DEFAULT_CALIBRATION, cooldown: -1 }, storage)).toBe(false)
-    expect(storage.getItem(CALIBRATION_STORAGE_KEY)).toBeNull()
-  })
-
-  it('reports a failed save and still loads the defaults', () => {
-    const storage = failingStorage()
-    expect(saveCalibration(DEFAULT_CALIBRATION, storage)).toBe(false)
-    expect(loadCalibration(storage)).toEqual(DEFAULT_CALIBRATION)
-  })
-
-  it('reset removes the saved profile and returns the defaults', () => {
-    const storage = memoryStorage()
-    saveCalibration({ ...DEFAULT_CALIBRATION, cooldown: 3 }, storage)
-
-    expect(resetCalibration(storage)).toEqual(DEFAULT_CALIBRATION)
-    expect(storage.getItem(CALIBRATION_STORAGE_KEY)).toBeNull()
+    fakeBackend.online = false
+    expect(await saveCalibration(DEFAULT_CALIBRATION)).toBe(false)
+    expect(await fetchCalibration()).toBeUndefined()
   })
 })

@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Gesture calibration saved from the dashboard Settings page
+data/calibration.json

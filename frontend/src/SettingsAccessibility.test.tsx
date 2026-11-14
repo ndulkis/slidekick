@@ -1,9 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import App from './App'
 import { CALIBRATION_CONTROLS } from './settings/calibrationSettings'
+import { fakeBackend } from './test/fakeBackend'
 
 // Accessibility checks for the Gesture Calibration section (SCRUM-89),
 // based on the WCAG findings in sprints/S4-R02-T1-Calibration-Accessibility-Research.md.
@@ -18,14 +19,6 @@ function renderSettings() {
 }
 
 describe('Settings calibration accessibility', () => {
-  beforeEach(() => {
-    localStorage.clear()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
   it('uses a logical heading structure', () => {
     renderSettings()
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
@@ -50,23 +43,20 @@ describe('Settings calibration accessibility', () => {
     expect(status).toBeEmptyDOMElement()
   })
 
-  it('raises an alert when the browser blocks saving', async () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('storage blocked')
-    })
+  it('raises an alert when SlideKick refuses the calibration', async () => {
+    fakeBackend.rejectCalibration = true
     const user = renderSettings()
 
     await user.click(screen.getByRole('button', { name: 'Save calibration' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent(
+    expect(await screen.findByRole('alert')).toHaveTextContent(
       "Your calibration couldn't be saved. Try again. Your previous settings are still in use.",
     )
   })
 
-  it('tells users the settings are not applied to recognition yet', () => {
+  it('tells users when SlideKick is not running', async () => {
+    fakeBackend.online = false
     renderSettings()
-    expect(
-      screen.getByText(/these settings aren't applied to gesture recognition yet/),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/Can't reach SlideKick/)).toBeInTheDocument()
   })
 })
