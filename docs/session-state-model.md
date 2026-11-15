@@ -93,3 +93,16 @@ The requirements diagram has a Customizing Gestures state driven by UC9. It is n
 | `ENDED` | Allowed | The session is over and can be restarted with the new profile |
 
 Gesture events keep the same rule as before in every state. Only `RUNNING` passes them on, whichever profile is active.
+
+## Gesture profile changes by state
+
+The requirements diagram has a Customizing Gestures state driven by UC9. It is not a separate state in `SessionState`. Changing the gesture profile is an action the coordinator allows or refuses based on the current state, and it never changes the state.
+
+| State | `apply_profile` | Why |
+|---|---|---|
+| `IDLE` | Allowed | Nothing is being recognized |
+| `RUNNING` | Refused with `ProfileChangeError` | Bindings should not change while gestures are being acted on. Pause first |
+| `PAUSED` | Allowed | Gestures are ignored, so the change is safe. Resume afterwards |
+| `ENDED` | Allowed | The session is over and can be restarted with the new profile |
+
+Gesture events keep the same rule as before in every state. Only `RUNNING` passes them on, whichever profile is active.
