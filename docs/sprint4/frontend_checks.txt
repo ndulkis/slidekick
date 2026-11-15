@@ -1,0 +1,30 @@
+== npm run lint
+
+> frontend@0.0.0 lint
+> oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 28ms on 31 files with 116 rules using 1 threads.
+== npm run typecheck
+
+> frontend@0.0.0 typecheck
+> tsc -b --noEmit
+
+== npm run test
+     ✓ runs a full session with only the keyboard  306ms
+ ✓ src/session/SessionMessage.test.tsx (6 tests) 217ms
+ ✓ src/session/SessionStatusBadge.test.tsx (5 tests) 172ms
+ ✓ src/App.test.tsx (3 tests) 216ms
+
+ Test Files  11 passed (11)
+      Tests  88 passed (88)
+   Start at  03:11:25
+   Duration  17.03s (transform 344ms, setup 1.69s, import 660ms, tests 4.43s, environment 8.87s)
+
+== npm run build
+computing gzip size...
+dist/index.html                   0.45 kB │ gzip:  0.29 kB
+dist/assets/index-D-cypsiN.css    3.23 kB │ gzip:  1.22 kB
+dist/assets/index-BBxfq6uL.js   267.08 kB │ gzip: 84.38 kB
+
+✓ built in 257ms

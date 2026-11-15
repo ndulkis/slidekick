@@ -1,0 +1,11 @@
+ruff check .
+All checks passed!
+
+ruff format --check .
+82 files already formatted
+
+bandit -r src/ windows_helper.py
+	No issues identified.
+		Low: 0
+		Medium: 0
+		High: 0
