@@ -1,8 +1,10 @@
 """The `slidekick` runner starts the camera per session, without real camera imports."""
 
 import importlib
+import plistlib
 import sys
 import types
+from pathlib import Path
 from unittest.mock import Mock
 
 from slidekick.api_server import Backend
@@ -76,6 +78,7 @@ def test_dashboard_opens_in_an_app_window_when_chrome_is_available(
     monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/bin/node")
     monkeypatch.setattr(runner, "wait_for_port", lambda port: True)
 
+    monkeypatch.setattr(runner, "native_window_command", lambda url, work_dir: None)
     monkeypatch.setattr(runner, "find_app_browser", lambda: "/chrome")
     assert len(runner.start_dashboard("/tmp/profile")) == 2
     vite, browser = launched
@@ -91,6 +94,30 @@ def test_dashboard_opens_in_an_app_window_when_chrome_is_available(
     monkeypatch.setattr(runner, "find_app_browser", lambda: None)
     assert len(runner.start_dashboard("/tmp/profile")) == 1
     assert launched[0][-2:] == ["--open", "/session"]
+
+    # macOS with pywebview: a native window instead of Chrome.
+    launched.clear()
+    monkeypatch.setattr(
+        runner, "native_window_command", lambda url, work_dir: ["native", url]
+    )
+    assert len(runner.start_dashboard("/tmp/profile")) == 2
+    assert "--open" not in launched[0]
+    assert launched[1] == ["native", "http://localhost:5173/session"]
+
+
+def test_window_python_runs_from_a_slidekick_app_bundle(monkeypatch, tmp_path):
+    # Without Python.app (not a framework build) there is nothing to bundle.
+    monkeypatch.setattr(runner.sys, "base_prefix", str(tmp_path / "base"))
+    assert runner.window_python(str(tmp_path)) == runner.sys.executable
+
+    python_app = tmp_path / "base/Resources/Python.app/Contents/MacOS/Python"
+    python_app.parent.mkdir(parents=True)
+    python_app.touch()
+    executable = Path(runner.window_python(str(tmp_path)))
+    assert executable.parts[-4:] == ("SlideKick.app", "Contents", "MacOS", "SlideKick")
+    assert executable.resolve() == python_app.resolve()
+    info = plistlib.loads((executable.parents[1] / "Info.plist").read_bytes())
+    assert info["CFBundleName"] == "SlideKick"
 
 
 def test_dashboard_is_skipped_when_the_frontend_is_not_installed(monkeypatch, tmp_path):
