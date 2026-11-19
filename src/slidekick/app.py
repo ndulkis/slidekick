@@ -119,6 +119,7 @@ def main():
         session,
         calibration_path=REPO_ROOT / "data/calibration.json",
         camera_path=REPO_ROOT / "data/camera.json",
+        bindings_path=REPO_ROOT / "data/gesture_bindings.json",
     )
     serve_in_background(backend)
     print(f"Dashboard API: http://127.0.0.1:{API_PORT}/api/session")
