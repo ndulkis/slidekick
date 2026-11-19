@@ -245,3 +245,85 @@ def test_alive_stream_counts_the_dashboard_while_connected(tmp_path):
     assert backend._dashboards == 1
     res.close()  # the browser went away
     assert backend._dashboards == 0
+
+
+def make_bindings_client(tmp_path, adapter=None):
+    adapter = adapter or Adapter()
+    coordinator = SessionCoordinator(gestures=GestureCommandController(adapter))
+    path = tmp_path / "gesture_bindings.json"
+    backend = Backend(coordinator, bindings_path=path)
+    return create_app(backend).test_client(), backend, adapter, path
+
+
+def put(client, path, body=None, **kwargs):
+    return client.put(path, json=body or {}, **kwargs)
+
+
+SWAPPED = {"swipe_right": "previous", "swipe_left": "next"}
+
+
+def test_bindings_start_with_the_defaults_and_never_offer_end(tmp_path):
+    client, _, _, _ = make_bindings_client(tmp_path)
+
+    body = client.get("/api/bindings").json
+    assert body["bindings"] == {"swipe_right": "next", "swipe_left": "previous"}
+    assert body["bindable_commands"] == ["next", "pause", "previous", "resume"]
+    assert body["gestures"] == ["swipe_left", "swipe_right"]
+
+
+def test_changed_binding_applies_to_the_next_gesture_and_is_saved(tmp_path):
+    client, backend, adapter, path = make_bindings_client(tmp_path)
+
+    res = put(client, "/api/bindings", {"bindings": SWAPPED})
+    assert res.status_code == 200
+    assert res.json["bindings"] == SWAPPED
+    assert json.loads(path.read_text())["bindings"] == SWAPPED
+
+    post(client, "/api/session/start")
+    assert swipe(backend)
+    assert adapter.calls == ["previous"]
+
+
+def test_rejected_bindings_change_nothing(tmp_path):
+    client, backend, adapter, path = make_bindings_client(tmp_path)
+
+    res = put(client, "/api/bindings", {"bindings": {"swipe_right": "end"}})
+    assert res.status_code == 400
+    assert "not a bindable command" in res.json["error"]
+    assert not path.exists()
+
+    post(client, "/api/session/start")
+    assert swipe(backend)
+    assert adapter.calls == ["next"]
+
+
+def test_malformed_bindings_body_is_rejected(tmp_path):
+    client, _, _, _ = make_bindings_client(tmp_path)
+
+    assert put(client, "/api/bindings", {"wrong": "shape"}).status_code == 400
+    assert put(client, "/api/bindings", {"bindings": "next"}).status_code == 400
+    # Writes still need JSON, like every other endpoint.
+    res = client.put("/api/bindings", data="x", content_type="text/plain")
+    assert res.status_code == 415
+
+
+def test_reset_restores_the_default_bindings(tmp_path):
+    client, _, _, path = make_bindings_client(tmp_path)
+    put(client, "/api/bindings", {"bindings": SWAPPED})
+
+    res = post(client, "/api/bindings/reset")
+    assert res.status_code == 200
+    assert res.json["bindings"] == {"swipe_right": "next", "swipe_left": "previous"}
+    assert json.loads(path.read_text())["bindings"] == res.json["bindings"]
+
+
+def test_saved_bindings_are_loaded_when_slidekick_starts(tmp_path):
+    client, _, _, _ = make_bindings_client(tmp_path)
+    put(client, "/api/bindings", {"bindings": SWAPPED})
+
+    # A new backend, as after restarting SlideKick, reads the saved file.
+    restarted, backend, adapter, _ = make_bindings_client(tmp_path)
+    assert restarted.get("/api/bindings").json["bindings"] == SWAPPED
+    post(restarted, "/api/session/start")
+    assert swipe(backend)
+    assert adapter.calls == ["previous"]
