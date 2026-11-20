@@ -1,6 +1,9 @@
 """Read-only, controlled directory of validated v1 gesture profiles."""
+
 from pathlib import Path
+
 from .gesture_profile import GestureProfile, InvalidProfileError, load_profile
+
 
 class ProfileStore:
     def __init__(self, directory: Path):
@@ -14,7 +17,9 @@ class ProfileStore:
             if path.is_symlink() or not path.is_file():
                 continue
             try:
-                profile = load_profile(path, known_gestures={"swipe_left", "swipe_right"})
+                profile = load_profile(
+                    path, known_gestures={"swipe_left", "swipe_right"}
+                )
             except InvalidProfileError:
                 continue  # Corrupt files cannot become active.
             if profile.name not in {entry.name for entry in profiles}:

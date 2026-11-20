@@ -350,6 +350,7 @@ def test_error_text_quotes_only_a_short_piece_of_a_rejected_value(tmp_path):
     assert long_value not in message
     assert len(message) < 200
 
+
 from slidekick.command_policy import InvalidGestureBindingError
 from slidekick.gesture_profile import default_bindings, load_bindings, save_bindings
 

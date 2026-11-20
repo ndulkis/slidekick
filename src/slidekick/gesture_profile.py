@@ -202,6 +202,7 @@ def load_profile(
 
     return profile_from_mapping(data, known)
 
+
 logger = logging.getLogger(__name__)
 
 PROFILE_ID = "default"

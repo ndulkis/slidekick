@@ -59,7 +59,9 @@ class SessionCoordinator:
         if not isinstance(profile, GestureProfile):
             raise ProfileChangeError("apply_profile needs a GestureProfile")
         if self.state is SessionState.RUNNING:
-            raise ProfileChangeError("Pause the session before changing the gesture profile")
+            raise ProfileChangeError(
+                "Pause the session before changing the gesture profile"
+            )
         self.gestures.set_gesture_bindings(profile.bindings)
         self.profile_name = profile.name
 

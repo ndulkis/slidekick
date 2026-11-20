@@ -118,7 +118,9 @@ class Backend:
         bindings_path: Path | None = None,
     ) -> None:
         self.coordinator = coordinator
-        self.profile_store = ProfileStore(profile_dir) if profile_dir is not None else None
+        self.profile_store = (
+            ProfileStore(profile_dir) if profile_dir is not None else None
+        )
         self.calibration_path = calibration_path
         self.calibration = load_calibration(calibration_path)
         # Saved gesture-to-command bindings replace the controller's defaults.
@@ -375,7 +377,9 @@ class Backend:
         with self._lock:
             entries = self.profile_store.list_profiles() if self.profile_store else []
             return {
-                "profiles": [{"name": p.name, "bindings": dict(p.bindings)} for p in entries],
+                "profiles": [
+                    {"name": p.name, "bindings": dict(p.bindings)} for p in entries
+                ],
                 "active": self.coordinator.profile_name,
                 "state": self.coordinator.state.value,
             }
@@ -389,8 +393,10 @@ class Backend:
                 raise ValueError("Unknown or invalid profile")
             self.coordinator.apply_profile(profile)
             self.last_gesture = None
-            return {"active": self.coordinator.profile_name,
-                    "state": self.coordinator.state.value}
+            return {
+                "active": self.coordinator.profile_name,
+                "state": self.coordinator.state.value,
+            }
 
     def bindings(self) -> dict[str, str]:
         with self._lock:
