@@ -16,12 +16,22 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
+from .command_policy import (
+    PROFILE_BINDABLE_COMMANDS,
+    InvalidGestureBindingError,
+    validate_gesture_bindings,
+)
 from .contracts import SessionState
+from .gesture_profile import default_bindings, load_bindings, save_bindings
 from .profile_store import ProfileStore
 from .recognition.camera import list_cameras, resolve_camera
 from .recognition.swipe_recognizer import GestureCalibration
 from .session_controller import InvalidTransitionError
-from .session_coordinator import (PresentationCommandError, ProfileChangeError, SessionCoordinator)
+from .session_coordinator import (
+    PresentationCommandError,
+    ProfileChangeError,
+    SessionCoordinator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +46,9 @@ CALIBRATION_FIELDS = (
     "confidence_threshold",
     "swipe_cooldown",
 )
+
+# Gestures the Settings page can bind: the dynamic swipes recognition emits.
+BINDABLE_GESTURES = ("swipe_left", "swipe_right")
 
 SESSION_ACTIONS = ("start", "pause", "resume", "end")
 
@@ -102,11 +115,16 @@ class Backend:
         calibration_path: Path | None = None,
         camera_path: Path | None = None,
         profile_dir: Path | None = None,
+        bindings_path: Path | None = None,
     ) -> None:
         self.coordinator = coordinator
         self.profile_store = ProfileStore(profile_dir) if profile_dir is not None else None
         self.calibration_path = calibration_path
         self.calibration = load_calibration(calibration_path)
+        # Saved gesture-to-command bindings replace the controller's defaults.
+        self.bindings_path = bindings_path
+        if bindings_path is not None:
+            coordinator.gestures.set_gesture_bindings(load_bindings(bindings_path))
         # The chosen camera is saved by unique ID, because indexes shift
         # when an iPhone connects or disconnects.
         self.camera_path = camera_path
@@ -364,7 +382,7 @@ class Backend:
 
     def activate_profile(self, name: Any) -> dict[str, Any]:
         if not isinstance(name, str):
-            raise ValueError("Profile name must be a string")
+            raise TypeError("Profile name must be a string")
         with self._lock:
             profile = self.profile_store.get(name) if self.profile_store else None
             if profile is None:
@@ -373,6 +391,27 @@ class Backend:
             self.last_gesture = None
             return {"active": self.coordinator.profile_name,
                     "state": self.coordinator.state.value}
+
+    def bindings(self) -> dict[str, str]:
+        with self._lock:
+            return dict(self.coordinator.gestures.gesture_bindings)
+
+    def set_bindings(self, bindings: Any) -> dict[str, str]:
+        """Validate, save, and apply the bindings right away. Raises
+        InvalidGestureBindingError, changing nothing, if the policy rejects them.
+        """
+        if self.bindings_path is not None:
+            validated = save_bindings(self.bindings_path, bindings)
+        else:
+            validated = validate_gesture_bindings(bindings)
+        # The camera loop reads the bindings on every gesture.
+        with self._lock:
+            self.coordinator.gestures.set_gesture_bindings(validated)
+            self.coordinator.profile_name = None
+        return validated
+
+    def reset_bindings(self) -> dict[str, str]:
+        return self.set_bindings(default_bindings())
 
     def status(self) -> dict[str, Any]:
         with self._lock:
@@ -496,8 +535,36 @@ def create_app(backend: Backend) -> Flask:
             return jsonify(backend.activate_profile(data["name"]))
         except ProfileChangeError as exc:
             return jsonify(error=str(exc)), 409
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             return jsonify(error=str(exc)), 400
+
+    def bindings_body(bindings: dict[str, str]) -> dict[str, Any]:
+        return {
+            "bindings": bindings,
+            "bindable_commands": sorted(PROFILE_BINDABLE_COMMANDS),
+            # Custom gesture names come from a trained model and are added in
+            # Sprint 6; until then the swipes plus anything already bound.
+            "gestures": sorted(set(BINDABLE_GESTURES) | set(bindings)),
+        }
+
+    @app.get("/api/bindings")
+    def get_bindings():
+        return jsonify(bindings_body(backend.bindings()))
+
+    @app.put("/api/bindings")
+    def put_bindings():
+        body = request.get_json()
+        try:
+            bindings = backend.set_bindings(
+                body.get("bindings") if isinstance(body, dict) else None
+            )
+        except InvalidGestureBindingError as exc:
+            return jsonify(error=str(exc)), 400
+        return jsonify(bindings_body(bindings))
+
+    @app.post("/api/bindings/reset")
+    def reset_bindings():
+        return jsonify(bindings_body(backend.reset_bindings()))
 
     @app.get("/api/cameras")
     def get_cameras():

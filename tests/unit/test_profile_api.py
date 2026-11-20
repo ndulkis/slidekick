@@ -3,6 +3,7 @@ from slidekick.api_server import Backend, create_app
 from slidekick.gesture_command_controller import GestureCommandController
 from slidekick.session_coordinator import SessionCoordinator
 
+
 class Adapter:
     def __init__(self):
         self.calls = []
@@ -46,4 +47,5 @@ def test_switch_paused_and_reject_running(tmp_path):
     assert backend.handle_event(event)
     assert adapter.calls == ["next", "previous"]
     assert client.put("/api/profiles/active", json={"name":"nonexistent"}).status_code == 400
+    assert client.put("/api/profiles/active", json={"name": 3}).status_code == 400
     assert backend.coordinator.profile_name == "b"

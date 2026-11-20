@@ -9,6 +9,7 @@ session. Activating a profile is the job of SessionCoordinator.apply_profile.
 """
 
 import json
+import logging
 import re
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
@@ -200,3 +201,49 @@ def load_profile(
         raise InvalidProfileError("profile file is nested too deeply") from exc
 
     return profile_from_mapping(data, known)
+
+logger = logging.getLogger(__name__)
+
+PROFILE_ID = "default"
+
+
+def default_bindings() -> dict[str, str]:
+    return dict(DEFAULT_GESTURE_BINDINGS)
+
+
+def load_bindings(path: Path | None) -> dict[str, str]:
+    """Read the saved bindings, falling back to the defaults if missing or bad."""
+    if path is None or not path.exists():
+        return default_bindings()
+    try:
+        return validate_gesture_bindings(json.loads(path.read_text())["bindings"])
+    except (
+        OSError,
+        json.JSONDecodeError,
+        KeyError,
+        TypeError,
+        InvalidGestureBindingError,
+    ):
+        logger.warning(
+            "Ignoring unreadable gesture bindings file %s", path, exc_info=True
+        )
+        return default_bindings()
+
+
+def save_bindings(path: Path, bindings: Mapping[str, str]) -> dict[str, str]:
+    """Validate and save the bindings. Raises InvalidGestureBindingError, and
+    writes nothing, if any binding is rejected by the policy.
+    """
+    validated = validate_gesture_bindings(bindings)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "version": PROFILE_VERSION,
+                "profile_id": PROFILE_ID,
+                "bindings": validated,
+            },
+            indent=2,
+        )
+    )
+    return validated

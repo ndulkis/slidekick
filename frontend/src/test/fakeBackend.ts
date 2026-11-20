@@ -25,6 +25,7 @@ function initial() {
     calibration: toBackend(DEFAULT_CALIBRATION) as Record<string, number>,
     /** When set, PUT /api/calibration answers 400. */
     rejectCalibration: false,
+    bindings: { swipe_right: 'next', swipe_left: 'previous' } as Record<string, string>,
     cameras: [
       { id: 'builtin', name: 'MacBook Pro Camera' },
       { id: 'phone', name: 'iPhone Camera' },
@@ -110,6 +111,32 @@ export function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise
     }
   }
 
+  // Mirrors api_server.py and command_policy.py: only these can be bound.
+  const bindable = ['next', 'pause', 'previous', 'resume']
+  const bindingsBody = () => ({
+    bindings: fakeBackend.bindings,
+    bindable_commands: bindable,
+    gestures: ['swipe_left', 'swipe_right'],
+  })
+  if (path === '/api/bindings') {
+    if (method === 'GET') return json(bindingsBody())
+    if (method === 'PUT') {
+      const { bindings } = JSON.parse(String(init?.body)) as { bindings: Record<string, string> }
+      const bad = Object.entries(bindings).find(([, command]) => !bindable.includes(command))
+      if (bad) {
+        return json(
+          { error: `gesture '${bad[0]}' maps to '${bad[1]}', which is not a bindable command` },
+          400,
+        )
+      }
+      fakeBackend.bindings = bindings
+      return json(bindingsBody())
+    }
+  }
+  if (path === '/api/bindings/reset' && method === 'POST') {
+    fakeBackend.bindings = { swipe_right: 'next', swipe_left: 'previous' }
+    return json(bindingsBody())
+  }
   if (path === '/api/cameras') {
     const cameras = () => ({ cameras: fakeBackend.cameras, selected: fakeBackend.selectedCamera })
     if (method === 'GET') return json(cameras())
