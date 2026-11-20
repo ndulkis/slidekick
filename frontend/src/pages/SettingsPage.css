@@ -44,26 +44,24 @@
   margin: 16px 0;
 }
 
-.calibration-actions button {
+/* Look comes from the shared button styles in index.css; this only keeps
+   them at least 44px tall, a comfortable click and touch target. */
+.calibration-actions button,
+.profile-picker button,
+.profile-picker select {
   min-height: 44px;
-  padding: 10px 20px;
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-h);
-  background: var(--accent-bg);
-  border: 2px solid var(--accent);
-  border-radius: 8px;
-  cursor: pointer;
 }
 
-.calibration-actions button:hover:not(:disabled) {
-  background: var(--accent-border);
+.profile-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 16px 0 8px;
 }
 
-.calibration-actions button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.profile-bindings {
+  font-size: 0.9em;
 }
 
 .calibration-status,
