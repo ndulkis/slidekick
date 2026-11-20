@@ -15,10 +15,10 @@ function StartEndControl({ status, onStart, onEnd }: StartEndControlProps) {
 
   return (
     <>
-      <button type="button" onClick={onStart} disabled={!canStart}>
+      <button type="button" className="button-primary" onClick={onStart} disabled={!canStart}>
         {startLabel}
       </button>
-      <button type="button" onClick={onEnd} disabled={!canEnd}>
+      <button type="button" className="button-danger" onClick={onEnd} disabled={!canEnd}>
         End session
       </button>
     </>
