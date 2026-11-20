@@ -69,13 +69,14 @@ h2 {
   color: var(--text-h);
 }
 
+/* Sized for an app window (about 1100 x 850), not a landing page, so the
+   camera preview gets the room. */
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
+  font-size: 32px;
+  letter-spacing: -0.64px;
+  margin: 8px 0 16px;
   @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+    font-size: 28px;
   }
 }
 h2 {
