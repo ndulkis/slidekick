@@ -1,0 +1,14 @@
+Mutation check on the new code. Each change below was made on purpose, the three new
+test files were run, and the change was undone. A caught change means tests failed.
+
+Tests run: tests/unit/test_gesture_profile.py, tests/unit/test_session_apply_profile.py,
+tests/integration/test_gesture_profile_pipeline.py
+
+unchanged code                          117 passed
+apply_profile allowed while RUNNING     2 failed, 115 passed     caught
+known gestures check skipped            4 failed, 113 passed     caught
+repeated JSON keys accepted             2 failed, 115 passed     caught
+file size limit skipped                 1 failed, 116 passed     caught
+unknown profile fields accepted         5 failed, 112 passed     caught
+type check in apply_profile skipped     7 failed, 110 passed     caught
+code restored                           117 passed

@@ -137,7 +137,6 @@ export function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise
     fakeBackend.bindings = { swipe_right: 'next', swipe_left: 'previous' }
     return json(bindingsBody())
   }
-
   if (path === '/api/cameras') {
     const cameras = () => ({ cameras: fakeBackend.cameras, selected: fakeBackend.selectedCamera })
     if (method === 'GET') return json(cameras())

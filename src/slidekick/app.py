@@ -119,6 +119,7 @@ def main():
         session,
         calibration_path=REPO_ROOT / "data/calibration.json",
         camera_path=REPO_ROOT / "data/camera.json",
+        profile_dir=REPO_ROOT / "profiles",
         bindings_path=REPO_ROOT / "data/gesture_bindings.json",
     )
     serve_in_background(backend)
