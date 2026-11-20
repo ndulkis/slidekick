@@ -23,10 +23,15 @@ from .command_policy import (
 )
 from .contracts import SessionState
 from .gesture_profile import default_bindings, load_bindings, save_bindings
+from .profile_store import ProfileStore
 from .recognition.camera import list_cameras, resolve_camera
 from .recognition.swipe_recognizer import GestureCalibration
 from .session_controller import InvalidTransitionError
-from .session_coordinator import PresentationCommandError, SessionCoordinator
+from .session_coordinator import (
+    PresentationCommandError,
+    ProfileChangeError,
+    SessionCoordinator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,9 +114,13 @@ class Backend:
         coordinator: SessionCoordinator,
         calibration_path: Path | None = None,
         camera_path: Path | None = None,
+        profile_dir: Path | None = None,
         bindings_path: Path | None = None,
     ) -> None:
         self.coordinator = coordinator
+        self.profile_store = (
+            ProfileStore(profile_dir) if profile_dir is not None else None
+        )
         self.calibration_path = calibration_path
         self.calibration = load_calibration(calibration_path)
         # Saved gesture-to-command bindings replace the controller's defaults.
@@ -364,6 +373,31 @@ class Backend:
         self.calibration = calibration
         return calibration
 
+    def profiles(self) -> dict[str, Any]:
+        with self._lock:
+            entries = self.profile_store.list_profiles() if self.profile_store else []
+            return {
+                "profiles": [
+                    {"name": p.name, "bindings": dict(p.bindings)} for p in entries
+                ],
+                "active": self.coordinator.profile_name,
+                "state": self.coordinator.state.value,
+            }
+
+    def activate_profile(self, name: Any) -> dict[str, Any]:
+        if not isinstance(name, str):
+            raise TypeError("Profile name must be a string")
+        with self._lock:
+            profile = self.profile_store.get(name) if self.profile_store else None
+            if profile is None:
+                raise ValueError("Unknown or invalid profile")
+            self.coordinator.apply_profile(profile)
+            self.last_gesture = None
+            return {
+                "active": self.coordinator.profile_name,
+                "state": self.coordinator.state.value,
+            }
+
     def bindings(self) -> dict[str, str]:
         with self._lock:
             return dict(self.coordinator.gestures.gesture_bindings)
@@ -379,6 +413,7 @@ class Backend:
         # The camera loop reads the bindings on every gesture.
         with self._lock:
             self.coordinator.gestures.set_gesture_bindings(validated)
+            self.coordinator.profile_name = None
         return validated
 
     def reset_bindings(self) -> dict[str, str]:
@@ -495,6 +530,22 @@ def create_app(backend: Backend) -> Flask:
         except CalibrationError as exc:
             return jsonify(error=str(exc)), 400
         return jsonify(calibration_fields(calibration))
+
+    @app.get("/api/profiles")
+    def get_profiles():
+        return jsonify(backend.profiles())
+
+    @app.put("/api/profiles/active")
+    def put_active_profile():
+        data = request.get_json()
+        if not isinstance(data, dict) or set(data) != {"name"}:
+            return jsonify(error="Expected exactly a profile name"), 400
+        try:
+            return jsonify(backend.activate_profile(data["name"]))
+        except ProfileChangeError as exc:
+            return jsonify(error=str(exc)), 409
+        except (TypeError, ValueError) as exc:
+            return jsonify(error=str(exc)), 400
 
     def bindings_body(bindings: dict[str, str]) -> dict[str, Any]:
         return {

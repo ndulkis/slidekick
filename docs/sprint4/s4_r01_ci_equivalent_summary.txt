@@ -1,0 +1,5 @@
+tests/unit: 313 passed in 0.26s
+tests/recognition: 29 passed in 0.42s
+tests/integration: 37 passed in 0.55s
+tests/performance: 5 passed, 1 skipped, 1 xfailed in 0.80s
+tests/smoke: 1 passed in 0.01s

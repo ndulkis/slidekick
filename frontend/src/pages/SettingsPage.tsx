@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import CameraPicker from '../settings/CameraPicker'
+import GestureProfileSection from '../settings/GestureProfileSection'
 import GestureBindingsSection from '../settings/GestureBindingsSection'
 import GestureCalibrationSection from '../settings/GestureCalibrationSection'
 import './SettingsPage.css'
@@ -19,6 +20,8 @@ function SettingsPage() {
         </p>
         <CameraPicker />
       </section>
+
+      <GestureProfileSection />
 
       <GestureCalibrationSection />
 

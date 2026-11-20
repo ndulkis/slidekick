@@ -90,3 +90,71 @@ describe('Settings calibration keyboard use', () => {
     expect(button('Reset to defaults')).not.toHaveFocus()
   })
 })
+
+// Keyboard-only use of the Gesture Bindings section (SCRUM-95). jsdom doesn't
+// open native dropdowns, so choosing an option uses selectOptions on the
+// focused dropdown; arrow-key changes are covered by the manual walkthrough.
+
+function dropdown(name: string) {
+  return screen.getByRole('combobox', { name }) as HTMLSelectElement
+}
+
+async function renderBindings() {
+  const user = renderSettings()
+  await waitFor(() => expect(dropdown('Swipe right')).toBeEnabled())
+  return user
+}
+
+describe('Settings gesture bindings keyboard use', () => {
+  it('reaches every binding control with Tab after calibration', async () => {
+    const user = await renderBindings()
+
+    button('Reset to defaults').focus()
+    await user.tab()
+    expect(dropdown('Swipe left')).toHaveFocus()
+    await user.tab()
+    expect(dropdown('Swipe right')).toHaveFocus()
+    await user.tab()
+    expect(button('Save bindings')).toHaveFocus()
+    await user.tab()
+    expect(button('Reset bindings to defaults')).toHaveFocus()
+  })
+
+  it('changes a binding and saves it with Enter', async () => {
+    const user = await renderBindings()
+
+    dropdown('Swipe right').focus()
+    await user.selectOptions(dropdown('Swipe right'), 'Previous slide')
+    expect(dropdown('Swipe right')).toHaveFocus()
+    await user.tab()
+    expect(button('Save bindings')).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('Gesture bindings saved.')).toBeInTheDocument()
+    expect(fakeBackend.bindings.swipe_right).toBe('previous')
+  })
+
+  it('resets the bindings to the defaults with Space', async () => {
+    fakeBackend.bindings = { swipe_right: 'previous', swipe_left: 'next' }
+    const user = await renderBindings()
+    await waitFor(() => expect(dropdown('Swipe right').value).toBe('previous'))
+
+    button('Reset bindings to defaults').focus()
+    await user.keyboard(' ')
+
+    expect(await screen.findByText('Gesture bindings reset to defaults.')).toBeInTheDocument()
+    expect(dropdown('Swipe right').value).toBe('next')
+    expect(dropdown('Swipe left').value).toBe('previous')
+  })
+
+  it('lets focus move on after the last binding control', async () => {
+    const user = await renderBindings()
+
+    button('Reset bindings to defaults').focus()
+    await user.keyboard(' ')
+    await screen.findByText('Gesture bindings reset to defaults.')
+    await user.tab()
+
+    expect(button('Reset bindings to defaults')).not.toHaveFocus()
+  })
+})
