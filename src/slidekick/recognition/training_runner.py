@@ -1,6 +1,6 @@
 """Launch custom gesture training using an external Python environment."""
 
-import subprocess
+import subprocess  # nosec B404 - Required for external training execution.
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,7 +38,7 @@ def run_training_job(
         str(job.export_dir),
     ]
 
-    completed = subprocess.run(
+    completed = subprocess.run(  # nosec B603 - Trusted interpreter and script paths.
         command,
         capture_output=True,
         text=True,
@@ -71,7 +71,7 @@ def run_training_job(
 def windows_path_to_wsl(path: Path) -> str:
     """Convert an absolute Windows path to its WSL equivalent."""
 
-    completed = subprocess.run(
+    completed = subprocess.run(  # nosec B603, B607 - Trusted WSL utilities; no shell.
         ["wsl.exe", "--exec", "wslpath", "-a", "-u", str(path.resolve())],
         capture_output=True,
         text=True,
@@ -111,7 +111,7 @@ def run_wsl_training_job(
         export_dir,
     ]
 
-    completed = subprocess.run(
+    completed = subprocess.run(  # nosec B603 - Trusted WSL training configuration.
         command,
         capture_output=True,
         text=True,
