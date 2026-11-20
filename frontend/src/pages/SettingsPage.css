@@ -1,7 +1,9 @@
+/* Each group of settings is a card. */
 .calibration-section {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 
 .calibration-intro {
