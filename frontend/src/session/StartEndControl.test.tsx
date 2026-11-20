@@ -39,6 +39,20 @@ describe('StartEndControl', () => {
     expect(screen.getByRole('button', { name: 'End session' })).toBeDisabled()
   })
 
+  it.each([
+    ['ready', 'Start session'],
+    ['ended', 'Start new session'],
+    ['loading', 'Start session'],
+    ['active', 'End session'],
+    ['paused', 'End session'],
+  ] as const)('shows only one big action when %s', (status, shown) => {
+    render(<StartEndControl status={status} onStart={vi.fn()} onEnd={vi.fn()} />)
+    for (const button of screen.getAllByRole('button')) {
+      // The other button stays in the page, collapsed by CSS.
+      expect(button.classList.contains('button-collapsed')).toBe(button.textContent !== shown)
+    }
+  })
+
   it('calls onStart when Start is clicked', () => {
     const onStart = vi.fn()
     const onEnd = vi.fn()

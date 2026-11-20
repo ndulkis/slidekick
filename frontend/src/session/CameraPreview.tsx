@@ -1,14 +1,20 @@
+import cameraOffIcon from '../assets/robot/camera-off.svg'
+import errorIcon from '../assets/robot/error.svg'
+import loadingIcon from '../assets/robot/loading.svg'
 import type { SessionStatus } from './types'
 
 interface CameraPreviewProps {
   status: SessionStatus
   hasCamera: boolean
+  /** A new camera is opening. The current one keeps streaming underneath. */
+  switching?: boolean
 }
 
-function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
+function CameraPreview({ status, hasCamera, switching = false }: CameraPreviewProps) {
   if (!hasCamera) {
     return (
       <div className="camera-preview camera-preview-empty" role="status">
+        <img src={errorIcon} alt="" />
         No camera source is available.
       </div>
     )
@@ -17,6 +23,7 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
   if (status === 'loading') {
     return (
       <div className="camera-preview camera-preview-loading" role="status">
+        <img src={loadingIcon} alt="" />
         Starting camera...
       </div>
     )
@@ -25,6 +32,7 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
   if (status === 'error') {
     return (
       <div className="camera-preview camera-preview-error" role="alert">
+        <img src={errorIcon} alt="" />
         Camera not available. Check camera access and try again.
       </div>
     )
@@ -35,6 +43,7 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
   if (status === 'ready' || status === 'ended') {
     return (
       <div className={`camera-preview camera-preview-${status}`} role="status">
+        <img src={cameraOffIcon} alt="" />
         Camera off
       </div>
     )
@@ -47,6 +56,12 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
   return (
     <div className={`camera-preview camera-preview-live camera-preview-${status}`}>
       <img src="/api/camera" alt={label} />
+      {switching && (
+        <div className="camera-preview-switching" role="status">
+          <img src={loadingIcon} alt="" />
+          Switching camera...
+        </div>
+      )}
     </div>
   )
 }

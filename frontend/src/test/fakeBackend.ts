@@ -34,6 +34,8 @@ function initial() {
     /** When set, PUT /api/cameras keeps the camera and reports why. */
     failCameraSwitch: false,
     cameraMessage: null as string | null,
+    /** A new camera is opening while the old one keeps streaming. */
+    cameraSwitching: false,
     /** Set by POST /api/quit. */
     hasQuit: false,
     gestureId: 0,
@@ -60,6 +62,7 @@ function status() {
     presentation_error: fakeBackend.presentationError,
     camera_message: fakeBackend.cameraMessage,
     camera_id: fakeBackend.camera === 'off' ? null : fakeBackend.selectedCamera,
+    camera_switching: fakeBackend.cameraSwitching,
   }
 }
 

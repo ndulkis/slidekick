@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { RecognitionEvent } from './types'
+import swipeNextIcon from '../assets/robot/swipe-next.svg'
+import swipePrevIcon from '../assets/robot/swipe-prev.svg'
+import type { Gesture, RecognitionEvent } from './types'
 import { gestureLabels } from './types'
+
+const gestureIcons: Partial<Record<Gesture, string>> = {
+  next: swipeNextIcon,
+  previous: swipePrevIcon,
+}
 
 interface GestureFeedbackToastProps {
   event?: RecognitionEvent
@@ -27,6 +34,7 @@ function GestureFeedbackToast({ event }: GestureFeedbackToastProps) {
 
   return (
     <div className="gesture-toast" role="status">
+      {gestureIcons[event.gesture] && <img src={gestureIcons[event.gesture]} alt="" />}
       {gestureLabels[event.gesture]}
     </div>
   )

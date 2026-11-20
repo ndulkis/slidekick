@@ -1,7 +1,9 @@
+/* Each group of settings is a card. */
 .calibration-section {
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 
 .calibration-intro {
@@ -42,26 +44,24 @@
   margin: 16px 0;
 }
 
-.calibration-actions button {
+/* Look comes from the shared button styles in index.css; this only keeps
+   them at least 44px tall, a comfortable click and touch target. */
+.calibration-actions button,
+.profile-picker button,
+.profile-picker select {
   min-height: 44px;
-  padding: 10px 20px;
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-h);
-  background: var(--accent-bg);
-  border: 2px solid var(--accent);
-  border-radius: 8px;
-  cursor: pointer;
 }
 
-.calibration-actions button:hover:not(:disabled) {
-  background: var(--accent-border);
+.profile-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 16px 0 8px;
 }
 
-.calibration-actions button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.profile-bindings {
+  font-size: 0.9em;
 }
 
 .calibration-status,
@@ -95,4 +95,10 @@
 .binding-row select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.calibration-status img {
+  height: 3em;
+  margin: -0.75em 4px -0.75em -8px;
+  vertical-align: middle;
 }

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 204 160" width="100%" height="100%" role="img" aria-label="Next slide">
+<title>Next slide</title>
+<style>
+.head{animation:nudge 1.4s ease-in-out infinite}
+@keyframes nudge{0%,60%,100%{transform:translateX(0)}25%{transform:translateX(7px)}}
+.c{animation:chev 1.4s ease-out infinite;opacity:0}.c2{animation-delay:.15s}.c3{animation-delay:.3s}
+@keyframes chev{0%{transform:translateX(-8px);opacity:0}30%{opacity:1}70%,100%{transform:translateX(6px);opacity:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}.z,.c{opacity:1}}
+</style>
+  <g class="head">
+    <ellipse cx="34" cy="80" rx="8" ry="15" fill="#fff" stroke="#001a4d" stroke-width="3"/>
+    <ellipse cx="126" cy="80" rx="8" ry="15" fill="#fff" stroke="#001a4d" stroke-width="3"/>
+    <rect x="38" y="48" width="84" height="64" rx="28" fill="#08f" stroke="#001a4d" stroke-width="3.5"/>
+    <rect x="49" y="58" width="62" height="44" rx="16" fill="#070b19" stroke="#001a4d" stroke-width="3"/>
+    <g class="eyes"><ellipse cx="72" cy="76" rx="6" ry="9" fill="#fe0"/><ellipse cx="98" cy="76" rx="6" ry="9" fill="#fe0"/></g>
+    <path d="M74 89Q80 91 86 89C86 96 74 96 74 89Z" fill="#f70"/>
+  </g>
+  <g fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path class="c" d="M146 64l14 16-14 16" stroke="#06f"/>
+    <path class="c c2" d="M162 64l14 16-14 16" stroke="#08f"/>
+    <path class="c c3" d="M178 64l14 16-14 16" stroke="#00e5ff"/>
+  </g>
+</svg>

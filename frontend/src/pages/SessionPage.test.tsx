@@ -86,6 +86,24 @@ describe('SessionPage', () => {
     expect(screen.getAllByText('Next').length).toBeGreaterThan(0)
   })
 
+  it('shows the gesture toast over the camera preview', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+
+    fakeBackend.emitGesture('next', 0.92)
+
+    const toast = await waitFor(() => {
+      const found = document.querySelector('.gesture-toast')
+      expect(found).not.toBeNull()
+      return found as HTMLElement
+    })
+    expect(toast).toHaveTextContent('Next')
+    // Same box as the preview, so the CSS can place it over its corner.
+    expect(toast.parentElement).toContainElement(
+      screen.getByRole('img', { name: 'Camera preview' }),
+    )
+  })
+
   it('treats no gesture as a normal state, not an error', async () => {
     await renderPage()
     await click('Start session', 'Active')
@@ -177,6 +195,17 @@ describe('SessionPage', () => {
       "Couldn't switch to MacBook Pro Camera, still using iPhone Camera.",
     )
     expect(picker).toHaveValue('phone')
+  })
+
+  it('shows a loading screen while the new camera opens', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+
+    fakeBackend.cameraSwitching = true
+    expect(await screen.findByText('Switching camera...')).toBeInTheDocument()
+
+    fakeBackend.cameraSwitching = false
+    await waitFor(() => expect(screen.queryByText('Switching camera...')).toBeNull())
   })
 
   it('hides the camera picker when there is only one camera', async () => {

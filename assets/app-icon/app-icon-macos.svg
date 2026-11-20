@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="SlideKick">
+<title>SlideKick</title>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14236b"/><stop offset="1" stop-color="#080c2b"/></linearGradient></defs>
+  <g transform="translate(100 100) scale(5.15)">
+  <rect width="160" height="160" rx="36" fill="url(#bg)"/>
+  <g transform="translate(80 80) scale(.9) translate(-80 -80)">
+    <circle cx="80" cy="80" r="68" fill="none" stroke="#00e5ff" stroke-width="4" stroke-linecap="round" stroke-dasharray="70 45 20 45" transform="rotate(-20 80 80)"/>
+    <g transform="translate(80 80) scale(1.13) translate(-80 -80)">
+    <ellipse cx="34" cy="80" rx="8" ry="15" fill="#fff" stroke="#001a4d" stroke-width="3"/>
+    <ellipse cx="126" cy="80" rx="8" ry="15" fill="#fff" stroke="#001a4d" stroke-width="3"/>
+    <rect x="38" y="48" width="84" height="64" rx="28" fill="#08f" stroke="#001a4d" stroke-width="3.5"/>
+    <rect x="49" y="58" width="62" height="44" rx="16" fill="#070b19" stroke="#001a4d" stroke-width="3"/>
+    <ellipse cx="67" cy="76" rx="6" ry="9" fill="#fe0"/>
+    <ellipse cx="93" cy="76" rx="6" ry="9" fill="#fe0"/>
+    <path d="M74 89Q80 91 86 89C86 96 74 96 74 89Z" fill="#f70"/>
+    </g>
+  </g>
+  </g>
+</svg>

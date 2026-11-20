@@ -43,3 +43,7 @@ requests
 # order OpenCV numbers them. macOS uses the built-in system_profiler instead,
 # which avoids this package's pyobjc dependency there.
 cv2_enumerate_cameras; sys_platform == "win32"
+
+# The dashboard's native window on macOS (dashboard_window.py), so the Dock
+# shows SlideKick's icon. Windows keeps the Chrome/Edge app window.
+pywebview; sys_platform == "darwin"

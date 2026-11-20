@@ -2,12 +2,17 @@
 dashboard itself, started together.
 """
 
+import importlib.util
 import os
+import plistlib
 import shutil
 import socket
 import subprocess  # nosec B404
+import sys
 import tempfile
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from .api_server import API_PORT, Backend, serve_in_background
@@ -19,6 +24,7 @@ from .session_coordinator import SessionCoordinator
 # the models, data/ and frontend/ live in the repo, not in the package.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_PORT = 5173
+APP_ICON = REPO_ROOT / "assets/app-icon/SlideKick.icns"
 
 
 def find_app_browser() -> str | None:
@@ -43,6 +49,46 @@ def find_app_browser() -> str | None:
     return None
 
 
+def native_window_command(url: str, work_dir: str) -> list[str] | None:
+    """macOS: the command that shows url in SlideKick's own native window
+    (dashboard_window.py), so the Dock shows SlideKick's icon, not Chrome's.
+    None on other systems, or when pywebview is not installed.
+    """
+    if sys.platform != "darwin" or importlib.util.find_spec("webview") is None:
+        return None
+    return [window_python(work_dir), "-m", "slidekick.dashboard_window", url]
+
+
+def window_python(work_dir: str) -> str:
+    """Python as the executable of a throwaway SlideKick.app in work_dir. The
+    Dock takes an app's name and icon from the bundle its executable is in,
+    so without this the window is labelled "Python".
+    """
+    # Only framework builds (python.org, Homebrew) have the GUI-capable
+    # Python.app; others keep the "Python" label.
+    python_app = Path(sys.base_prefix) / "Resources/Python.app/Contents/MacOS/Python"
+    if not python_app.exists():
+        return sys.executable
+    contents = Path(work_dir) / "SlideKick.app/Contents"
+    (contents / "MacOS").mkdir(parents=True)
+    (contents / "Resources").mkdir()
+    (contents / "MacOS/SlideKick").symlink_to(python_app)
+    (contents / "Resources/SlideKick.icns").symlink_to(APP_ICON)
+    (contents / "Info.plist").write_bytes(
+        plistlib.dumps(
+            {
+                "CFBundleName": "SlideKick",
+                "CFBundleDisplayName": "SlideKick",
+                "CFBundleIdentifier": "dev.slidekick.dashboard",
+                "CFBundleExecutable": "SlideKick",
+                "CFBundleIconFile": "SlideKick.icns",
+                "CFBundlePackageType": "APPL",
+            }
+        )
+    )
+    return str(contents / "MacOS/SlideKick")
+
+
 def wait_for_port(port: int, timeout: float = 15.0) -> bool:
     """True once something accepts connections on localhost:port."""
     deadline = time.monotonic() + timeout
@@ -55,12 +101,19 @@ def wait_for_port(port: int, timeout: float = 15.0) -> bool:
     return False
 
 
-def start_dashboard(profile_dir: str) -> list[subprocess.Popen]:
+def start_dashboard(
+    profile_dir: str, on_window_closed: Callable[[], None] | None = None
+) -> list[subprocess.Popen]:
     """Start the Vite dashboard dev server and open the dashboard.
 
-    The dashboard opens in a Chrome/Edge app window that this process owns,
-    so quitting SlideKick can close it, and closing it quits SlideKick. Without Chrome or Edge it opens as a
+    The dashboard opens in a window that this process owns, so quitting
+    SlideKick can close it, and closing it quits SlideKick: a native window on
+    macOS, otherwise a Chrome/Edge app window. Without either it opens as a
     tab in the default browser, which SlideKick cannot close.
+
+    on_window_closed runs as soon as the native window's process ends. (A
+    Chrome/Edge app window's process outlives its window on macOS, so that
+    one is noticed through /api/alive instead.)
 
     Returns the processes to terminate on exit.
     """
@@ -72,20 +125,22 @@ def start_dashboard(profile_dir: str) -> list[subprocess.Popen]:
         return []
     url = f"http://localhost:{DASHBOARD_PORT}/session"
     print(f"Dashboard: {url}")
-    browser = find_app_browser()
+    native = native_window_command(url, profile_dir)
+    browser = None if native else find_app_browser()
 
     # Vite runs with node directly instead of through npm, so terminating it
     # also stops the server on Windows (npm.cmd would leave node running).
     command = [node, str(vite), "--port", str(DASHBOARD_PORT), "--strictPort"]
-    if browser is None:
+    if native is None and browser is None:
         command += ["--open", "/session"]
     # Bandit is silenced on the import and on both Popen calls: fixed
     # argument lists, no shell, no user input.
     processes = [subprocess.Popen(command, cwd=frontend)]  # nosec B603
 
-    if browser is not None and wait_for_port(DASHBOARD_PORT):
+    if (native or browser) and wait_for_port(DASHBOARD_PORT):
         window = subprocess.Popen(  # nosec B603
-            [
+            native
+            or [
                 browser,
                 f"--app={url}",
                 # Its own profile keeps this a separate browser process.
@@ -103,8 +158,17 @@ def start_dashboard(profile_dir: str) -> list[subprocess.Popen]:
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            # The app bundle's Python is not the virtualenv's, so hand it
+            # this process's import path.
+            env={**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, sys.path))}
+            if native
+            else None,
         )
         processes.append(window)
+        if native and on_window_closed is not None:
+            threading.Thread(
+                target=lambda: (window.wait(), on_window_closed()), daemon=True
+            ).start()
     return processes
 
 
@@ -125,10 +189,13 @@ def main():
     serve_in_background(backend)
     print(f"Dashboard API: http://127.0.0.1:{API_PORT}/api/session")
 
-    # The browser profile is throwaway: the dashboard keeps nothing in it.
+    # The browser profile (or macOS app bundle) is throwaway: the dashboard
+    # keeps nothing in it.
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile_dir:
-        processes = start_dashboard(profile_dir)
-        # Only with the app window (vite + browser). A normal browser tab may
+        # Closing the native window quits at once, even with other dashboard
+        # pages (a browser tab) still open.
+        processes = start_dashboard(profile_dir, on_window_closed=backend.quit)
+        # Only with the app window (vite + window). A normal browser tab may
         # be suspended by the browser, which must not quit a presentation.
         backend.quit_when_dashboard_closes = len(processes) == 2
         print("Start a session from the dashboard. Quit there, or with Ctrl+C.")

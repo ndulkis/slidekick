@@ -70,27 +70,38 @@ function SessionPage() {
         </p>
       )}
 
-      <CameraPreview status={status} hasCamera={camera !== 'error'} />
+      <div className="session-main">
+        {/* The gesture toast shows over the preview, where the presenter is
+            already looking to check the camera sees them. */}
+        <div className="session-stage">
+          <CameraPreview
+            status={status}
+            hasCamera={camera !== 'error'}
+            switching={session.cameraSwitching}
+          />
+          <GestureFeedbackToast event={visibleEvent} />
+        </div>
 
-      {/* Shows the camera in use, so a failed switch shows the camera kept. */}
-      <CameraPicker disabled={camera === 'starting'} selected={session.cameraId} />
-      {session.cameraMessage && (
-        <p className="session-message" role="alert">
-          {session.cameraMessage}
-        </p>
-      )}
+        <div className="session-panel">
+          {/* Shows the camera in use, so a failed switch shows the camera kept. */}
+          <CameraPicker disabled={camera === 'starting'} selected={session.cameraId} />
+          {session.cameraMessage && (
+            <p className="session-message" role="alert">
+              {session.cameraMessage}
+            </p>
+          )}
 
-      <GestureFeedback status={status} event={visibleEvent} />
+          <div className="session-controls">
+            <StartEndControl status={status} onStart={session.start} onEnd={session.end} />
+            <PauseResumeControl
+              status={status}
+              onPause={session.pause}
+              onResume={session.resume}
+            />
+          </div>
 
-      <GestureFeedbackToast event={visibleEvent} />
-
-      <div className="session-controls">
-        <StartEndControl status={status} onStart={session.start} onEnd={session.end} />
-        <PauseResumeControl
-          status={status}
-          onPause={session.pause}
-          onResume={session.resume}
-        />
+          <GestureFeedback status={status} event={visibleEvent} />
+        </div>
       </div>
     </section>
   )

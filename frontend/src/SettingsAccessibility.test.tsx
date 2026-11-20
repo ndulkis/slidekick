@@ -22,6 +22,7 @@ describe('Settings calibration accessibility', () => {
   it('uses a logical heading structure', () => {
     renderSettings()
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Camera' })).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { level: 2, name: 'Gesture Calibration' }),
     ).toBeInTheDocument()

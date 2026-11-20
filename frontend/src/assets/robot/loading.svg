@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="100%" height="100%">
+  <style>
+    .orbit-cw {
+      animation: spinCW 2.4s linear infinite;
+      transform-origin: 80px 80px;
+    }
+    .orbit-ccw {
+      animation: spinCCW 3.2s linear infinite;
+      transform-origin: 80px 80px;
+    }
+    .think-bob {
+      animation: bob 1.6s ease-in-out infinite alternate;
+    }
+    .eye-think {
+      animation: eyeShift 2.4s ease-in-out infinite;
+    }
+    @keyframes spinCW {
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes spinCCW {
+      100% { transform: rotate(-360deg); }
+    }
+    @keyframes bob {
+      from { transform: translateY(-3px); }
+      to { transform: translateY(3px); }
+    }
+    @keyframes eyeShift {
+      0%, 100% { transform: translateX(0); }
+      30% { transform: translateX(-4px); }
+      70% { transform: translateX(4px); }
+    }
+  </style>
+
+  <!-- Outer Cyber Spinner Rings -->
+  <circle class="orbit-cw" cx="80" cy="80" r="68" fill="none" stroke="#00e5ff" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="70 45 20 45" />
+  <circle class="orbit-ccw" cx="80" cy="80" r="58" fill="none" stroke="#0066ff" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="40 60" />
+
+  <!-- Mini Robot Head -->
+  <g class="think-bob">
+    <ellipse cx="34" cy="80" rx="8" ry="15" fill="#ffffff" stroke="#001a4d" stroke-width="3" />
+    <ellipse cx="126" cy="80" rx="8" ry="15" fill="#ffffff" stroke="#001a4d" stroke-width="3" />
+    <rect x="38" y="48" width="84" height="64" rx="28" fill="#0088ff" stroke="#001a4d" stroke-width="3.5" />
+    <rect x="49" y="58" width="62" height="44" rx="16" fill="#070b19" stroke="#001a4d" stroke-width="3" />
+    <g class="eye-think">
+      <ellipse cx="67" cy="76" rx="6" ry="9" fill="#ffee00" />
+      <ellipse cx="93" cy="76" rx="6" ry="9" fill="#ffee00" />
+    </g>
+    <path d="M 74 89 Q 80 91 86 89 C 86 96, 74 96, 74 89 Z" fill="#ff7700" />
+  </g>
+</svg>

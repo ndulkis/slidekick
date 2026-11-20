@@ -46,10 +46,13 @@ function GestureProfileSection() {
   }
 
   return (
-    <section aria-labelledby="gesture-profile-title">
+    <section className="calibration-section" aria-labelledby="gesture-profile-title">
       <h2 id="gesture-profile-title">Gesture profiles</h2>
-      <p>Active profile: <strong>{data?.active ?? 'Default controller bindings'}</strong></p>
-      <p>Pause the presentation session before activating another profile.</p>
+      <p className="calibration-intro">
+        Active profile: <strong>{data?.active ?? 'Default controller bindings'}</strong>. Pause the
+        presentation session before activating another profile.
+      </p>
+      <div className="profile-picker">
       <label htmlFor="gesture-profile-select">Select gesture profile</label>{' '}
       <select id="gesture-profile-select" value={selected}
         onChange={(e) => setSelected(e.target.value)}
@@ -62,9 +65,10 @@ function GestureProfileSection() {
         disabled={busy || !selected || selected === data?.active}>
         {busy ? 'Activating...' : 'Activate profile'}
       </button>
-      {error && <p role="alert">{error}</p>}
+      </div>
+      {error && <p className="calibration-error" role="alert">{error}</p>}
       {data?.profiles.find((p) => p.name === selected) && (
-        <p>Bindings: {Object.entries(data.profiles.find((p) => p.name === selected)!.bindings)
+        <p className="profile-bindings">Bindings: {Object.entries(data.profiles.find((p) => p.name === selected)!.bindings)
           .map(([gesture, command]) => `${gesture} → ${command}`).join(', ')}</p>
       )}
     </section>
