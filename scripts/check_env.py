@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that the SlideKick dev environment is set up correctly.
 
-Run it with `PYTHONPATH=src python scripts/check_env.py` (or via
+Run it with `python scripts/check_env.py` (or via
 scripts/verify.sh). It uses only the standard library, so it still gives a
 useful report when dependencies are missing or out of date.
 
@@ -50,7 +50,10 @@ def locked_packages() -> dict[str, str]:
     pins = {}
     for line in (ROOT / "requirements.lock").read_text().splitlines():
         match = re.match(r"^([A-Za-z0-9._-]+)==([^\s;]+)", line)
-        if match:
+        # Skip packages for another OS, like `; sys_platform == "win32"`.
+        # ponytail: only this marker form; use packaging.markers for others.
+        platform = re.search(r';\s*sys_platform\s*==\s*"([^"]+)"', line)
+        if match and (platform is None or platform.group(1) == sys.platform):
             pins[match.group(1)] = match.group(2)
     return pins
 
@@ -91,8 +94,8 @@ def check_slidekick_importable() -> Result:
         return Result(
             FAIL,
             name,
-            f"PYTHONPATH={os.environ.get('PYTHONPATH', '(unset)')}",
-            "Run with `PYTHONPATH=src` from the repo root.",
+            str(locations[0]) if locations else "not installed",
+            "Run `pip install -e .` from the repo root.",
         )
     return Result(PASS, name)
 
@@ -252,7 +255,7 @@ def check_configuration() -> Result:
         from slidekick.config import ConfigError, load_settings
     except ImportError as exc:
         return Result(
-            FAIL, name, str(exc), "Run with `PYTHONPATH=src` from the repo root."
+            FAIL, name, str(exc), "Run `pip install -e .` from the repo root."
         )
     try:
         settings = load_settings()
