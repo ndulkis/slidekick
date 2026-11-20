@@ -10,7 +10,9 @@ import socket
 import subprocess  # nosec B404
 import sys
 import tempfile
+import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from .api_server import API_PORT, Backend, serve_in_background
@@ -99,13 +101,19 @@ def wait_for_port(port: int, timeout: float = 15.0) -> bool:
     return False
 
 
-def start_dashboard(profile_dir: str) -> list[subprocess.Popen]:
+def start_dashboard(
+    profile_dir: str, on_window_closed: Callable[[], None] | None = None
+) -> list[subprocess.Popen]:
     """Start the Vite dashboard dev server and open the dashboard.
 
     The dashboard opens in a window that this process owns, so quitting
     SlideKick can close it, and closing it quits SlideKick: a native window on
     macOS, otherwise a Chrome/Edge app window. Without either it opens as a
     tab in the default browser, which SlideKick cannot close.
+
+    on_window_closed runs as soon as the native window's process ends. (A
+    Chrome/Edge app window's process outlives its window on macOS, so that
+    one is noticed through /api/alive instead.)
 
     Returns the processes to terminate on exit.
     """
@@ -157,6 +165,10 @@ def start_dashboard(profile_dir: str) -> list[subprocess.Popen]:
             else None,
         )
         processes.append(window)
+        if native and on_window_closed is not None:
+            threading.Thread(
+                target=lambda: (window.wait(), on_window_closed()), daemon=True
+            ).start()
     return processes
 
 
@@ -179,7 +191,9 @@ def main():
     # The browser profile (or macOS app bundle) is throwaway: the dashboard
     # keeps nothing in it.
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile_dir:
-        processes = start_dashboard(profile_dir)
+        # Closing the native window quits at once, even with other dashboard
+        # pages (a browser tab) still open.
+        processes = start_dashboard(profile_dir, on_window_closed=backend.quit)
         # Only with the app window (vite + window). A normal browser tab may
         # be suspended by the browser, which must not quit a presentation.
         backend.quit_when_dashboard_closes = len(processes) == 2

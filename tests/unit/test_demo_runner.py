@@ -3,6 +3,7 @@
 import importlib
 import plistlib
 import sys
+import threading
 import types
 from pathlib import Path
 from unittest.mock import Mock
@@ -103,6 +104,27 @@ def test_dashboard_opens_in_an_app_window_when_chrome_is_available(
     assert len(runner.start_dashboard("/tmp/profile")) == 2
     assert "--open" not in launched[0]
     assert launched[1] == ["native", "http://localhost:5173/session"]
+
+
+def test_closing_the_native_window_quits_at_once(monkeypatch, tmp_path):
+    vite = tmp_path / "frontend/node_modules/vite/bin/vite.js"
+    vite.parent.mkdir(parents=True)
+    vite.touch()
+    monkeypatch.setattr(runner, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/bin/node")
+    monkeypatch.setattr(runner, "wait_for_port", lambda port: True)
+    monkeypatch.setattr(
+        runner, "native_window_command", lambda url, work_dir: ["native"]
+    )
+    window_closed = threading.Event()
+    window = Mock(wait=window_closed.wait)
+    monkeypatch.setattr(runner.subprocess, "Popen", Mock(side_effect=[Mock(), window]))
+
+    quit_app = threading.Event()
+    runner.start_dashboard("/tmp/profile", on_window_closed=quit_app.set)
+    assert not quit_app.is_set()
+    window_closed.set()  # the user closes the window
+    assert quit_app.wait(timeout=2)
 
 
 def test_window_python_runs_from_a_slidekick_app_bundle(monkeypatch, tmp_path):
