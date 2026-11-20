@@ -398,6 +398,9 @@ class Backend:
                     if self.active_camera and self.camera in ("starting", "ready")
                     else None
                 ),
+                # A new camera is opening; the old one streams until it is.
+                "camera_switching": self._switching_from is not None
+                and self.camera in ("starting", "ready"),
             }
 
 

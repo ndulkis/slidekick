@@ -99,3 +99,29 @@ button:focus-visible {
   margin: -0.7em 4px -0.7em -6px;
   vertical-align: middle;
 }
+
+/* Over the live stream while another camera opens; the old one stays
+   visible, dimmed, underneath. */
+.camera-preview-live {
+  position: relative;
+}
+
+.camera-preview-switching {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  font-weight: 500;
+  background: rgba(7, 11, 25, 0.7);
+  backdrop-filter: blur(6px);
+}
+
+.camera-preview-live .camera-preview-switching img {
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+}

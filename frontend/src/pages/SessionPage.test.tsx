@@ -179,6 +179,17 @@ describe('SessionPage', () => {
     expect(picker).toHaveValue('phone')
   })
 
+  it('shows a loading screen while the new camera opens', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+
+    fakeBackend.cameraSwitching = true
+    expect(await screen.findByText('Switching camera...')).toBeInTheDocument()
+
+    fakeBackend.cameraSwitching = false
+    await waitFor(() => expect(screen.queryByText('Switching camera...')).toBeNull())
+  })
+
   it('hides the camera picker when there is only one camera', async () => {
     fakeBackend.cameras = [{ id: 'default', name: 'Default camera' }]
     await renderPage()

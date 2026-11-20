@@ -191,16 +191,29 @@ def test_switch_mid_session_and_revert_on_failure(backend):
     # The old camera keeps streaming while the phone opens.
     assert backend.camera == "ready"
     assert backend.status()["camera_id"] == "3BA9"
+    assert backend.status()["camera_switching"] is True
     assert backend.get_camera() is PHONE
 
     backend.camera_switch_failed()
     status = backend.status()
     assert status["camera"] == "ready"
+    assert status["camera_switching"] is False
     assert status["camera_message"] == (
         "Couldn't switch to iPhone Camera, still using MacBook Pro Camera."
     )
     assert backend.get_camera() is BUILTIN
     assert backend.camera_id == "6C70"
+
+
+def test_switching_ends_when_the_new_camera_is_ready(backend):
+    backend.start()
+    backend.camera_ready()
+    assert backend.status()["camera_switching"] is False
+
+    backend.set_camera({"id": "3BA9"})
+    assert backend.status()["camera_switching"] is True
+    backend.camera_ready()
+    assert backend.status()["camera_switching"] is False
 
 
 def test_second_choice_during_a_switch_keeps_the_open_camera(backend, cameras):

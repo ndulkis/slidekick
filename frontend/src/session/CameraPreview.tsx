@@ -6,9 +6,11 @@ import type { SessionStatus } from './types'
 interface CameraPreviewProps {
   status: SessionStatus
   hasCamera: boolean
+  /** A new camera is opening. The current one keeps streaming underneath. */
+  switching?: boolean
 }
 
-function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
+function CameraPreview({ status, hasCamera, switching = false }: CameraPreviewProps) {
   if (!hasCamera) {
     return (
       <div className="camera-preview camera-preview-empty" role="status">
@@ -54,6 +56,12 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
   return (
     <div className={`camera-preview camera-preview-live camera-preview-${status}`}>
       <img src="/api/camera" alt={label} />
+      {switching && (
+        <div className="camera-preview-switching" role="status">
+          <img src={loadingIcon} alt="" />
+          Switching camera...
+        </div>
+      )}
     </div>
   )
 }

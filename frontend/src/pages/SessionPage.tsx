@@ -70,7 +70,11 @@ function SessionPage() {
         </p>
       )}
 
-      <CameraPreview status={status} hasCamera={camera !== 'error'} />
+      <CameraPreview
+        status={status}
+        hasCamera={camera !== 'error'}
+        switching={session.cameraSwitching}
+      />
 
       {/* Shows the camera in use, so a failed switch shows the camera kept. */}
       <CameraPicker disabled={camera === 'starting'} selected={session.cameraId} />

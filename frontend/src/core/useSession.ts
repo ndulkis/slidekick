@@ -26,6 +26,8 @@ type StatusBody = {
   camera_message?: string | null
   /** The camera in use, or being switched to. */
   camera_id?: string | null
+  /** A new camera is opening; the old one streams until it is. */
+  camera_switching?: boolean
 }
 
 type ActionBody = StatusBody & {
@@ -46,6 +48,7 @@ export function useSession() {
   const [presentationError, setPresentationError] = useState<string | null>(null)
   const [cameraMessage, setCameraMessage] = useState<string | null>(null)
   const [cameraId, setCameraId] = useState<string | null>(null)
+  const [cameraSwitching, setCameraSwitching] = useState(false)
   const [lastGesture, setLastGesture] = useState<LastGesture | null>(null)
 
   const apply = useCallback((body: StatusBody) => {
@@ -55,6 +58,7 @@ export function useSession() {
     setPresentationError(body.presentation_error)
     setCameraMessage(body.camera_message ?? null)
     setCameraId(body.camera_id ?? null)
+    setCameraSwitching(body.camera_switching ?? false)
     const next = body.last_gesture
     // Keep the same object while the id is unchanged, so polling doesn't
     // look like a new gesture (the toast re-shows on every new object).
@@ -112,6 +116,7 @@ export function useSession() {
     presentationError,
     cameraMessage,
     cameraId,
+    cameraSwitching,
     lastGesture,
     start: useCallback(() => act('start'), [act]),
     pause: useCallback(() => act('pause'), [act]),

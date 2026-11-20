@@ -47,6 +47,20 @@ describe('CameraPreview', () => {
     expect(video.parentElement).toHaveClass('camera-preview', 'camera-preview-paused')
   })
 
+  it('shows a loading screen over the stream while switching cameras', () => {
+    render(<CameraPreview status="active" hasCamera={true} switching />)
+    // The old camera keeps streaming underneath.
+    expect(screen.getByRole('img', { name: 'Camera preview' })).toBeInTheDocument()
+    const status = screen.getByRole('status')
+    expect(status).toHaveTextContent('Switching camera...')
+    expect(status).toHaveClass('camera-preview-switching')
+  })
+
+  it('shows no loading screen when not switching', () => {
+    render(<CameraPreview status="active" hasCamera={true} />)
+    expect(screen.queryByText('Switching camera...')).not.toBeInTheDocument()
+  })
+
   it('does not request the stream while the camera is off', () => {
     render(<CameraPreview status="ended" hasCamera={true} />)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()

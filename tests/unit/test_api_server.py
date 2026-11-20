@@ -57,6 +57,7 @@ def test_session_lifecycle_and_gestures(tmp_path):
         "presentation_error": None,
         "camera_message": None,
         "camera_id": None,
+        "camera_switching": False,
     }
 
     res = post(client, "/api/session/start")
