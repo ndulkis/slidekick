@@ -35,7 +35,7 @@ def main():
         gesture_bindings={
             "swipe_right": "next",
             "swipe_left": "previous",
-            "pinch": "end",
+            "pinch": "next",
         },
     )
     session = SessionCoordinator(gestures=controller)
