@@ -1,3 +1,4 @@
+import successIcon from '../assets/robot/success.svg'
 import { useEffect, useId, useState } from 'react'
 import type { Bindings, BindingsInfo, SaveResult } from './gestureBindings'
 import {
@@ -121,7 +122,12 @@ function GestureBindingsSection() {
 
       {/* Always rendered so screen readers announce changes to it. */}
       <p className="calibration-status" role="status">
-        {status ? statusMessages[status] : ''}
+        {status && (
+          <>
+            <img src={successIcon} alt="" />
+            {statusMessages[status]}
+          </>
+        )}
       </p>
 
       {error && (

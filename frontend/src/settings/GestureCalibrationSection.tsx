@@ -1,3 +1,4 @@
+import successIcon from '../assets/robot/success.svg'
 import { useEffect, useId, useState } from 'react'
 import CalibrationSlider from './CalibrationSlider'
 import type { CalibrationKey } from './calibrationSettings'
@@ -85,7 +86,12 @@ function GestureCalibrationSection() {
 
       {/* Always rendered so screen readers announce changes to it. */}
       <p className="calibration-status" role="status">
-        {status === 'saved' || status === 'reset' ? statusMessages[status] : ''}
+        {(status === 'saved' || status === 'reset') && (
+          <>
+            <img src={successIcon} alt="" />
+            {statusMessages[status]}
+          </>
+        )}
       </p>
 
       {status === 'error' && (

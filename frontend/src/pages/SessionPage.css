@@ -82,3 +82,20 @@ button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Robot state icons (src/assets/robot). */
+.camera-preview:not(.camera-preview-live) img {
+  display: block;
+  width: 128px;
+  height: 128px;
+  margin: 0 auto 8px;
+}
+
+/* The artwork sits inside padding in its square, so the icon is drawn
+   larger than the text and pulled in so the row height doesn't grow. */
+.status-badge img,
+.gesture-toast img {
+  height: 2.6em;
+  margin: -0.7em 4px -0.7em -6px;
+  vertical-align: middle;
+}
