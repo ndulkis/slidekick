@@ -10,16 +10,31 @@ function PauseResumeControl({ status, onPause, onResume }: PauseResumeControlPro
   const disabled =
     status === 'loading' || status === 'error' || status === 'ready' || status === 'ended'
 
+  // Only shown during a session; elsewhere it stays in the page, disabled.
+  const className = disabled ? 'button-collapsed' : undefined
+
   if (status === 'paused') {
     return (
-      <button type="button" onClick={onResume} disabled={disabled} aria-label="Resume session">
+      <button
+        type="button"
+        className={className}
+        onClick={onResume}
+        disabled={disabled}
+        aria-label="Resume session"
+      >
         Resume
       </button>
     )
   }
 
   return (
-    <button type="button" onClick={onPause} disabled={disabled} aria-label="Pause session">
+    <button
+      type="button"
+      className={className}
+      onClick={onPause}
+      disabled={disabled}
+      aria-label="Pause session"
+    >
       Pause
     </button>
   )

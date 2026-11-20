@@ -5,17 +5,48 @@
   margin: 16px 0;
 }
 
+/* Status pills: a colored dot (or the robot icon) and a label. */
 .status-badge,
 .presentation-status {
-  padding: 4px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text-h);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.status-badge::before,
+.presentation-status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-color, var(--text));
+}
+
+/* The active and paused badges show the robot instead of a dot. */
+.status-badge:has(img)::before {
+  display: none;
+}
+
+.status-badge-active,
+.presentation-status-connected {
+  --status-color: #22c55e;
+}
+
+.status-badge-loading,
+.status-badge-paused,
+.presentation-status-connecting {
+  --status-color: #f59e0b;
 }
 
 .status-badge-error,
 .presentation-status-error {
-  border-color: #b00020;
+  --status-color: var(--danger);
 }
 
 .camera-preview {
@@ -72,10 +103,74 @@
   font-weight: 500;
 }
 
+/* The preview with the controls beside it; stacked on narrow windows. */
+.session-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 24px;
+  align-items: start;
+  margin: 16px 0;
+}
+
+@media (max-width: 760px) {
+  .session-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.session-main .camera-preview {
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.session-main .camera-preview-live {
+  display: block;
+  padding: 0;
+}
+
+.session-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.session-panel .camera-picker label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+}
+
+.session-panel select {
+  width: 100%;
+}
+
+.session-panel .session-message,
+.session-panel .gesture-feedback {
+  margin: 0;
+}
+
 .session-controls {
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  margin: 16px 0;
+}
+
+.session-controls button {
+  width: 100%;
+  font-size: 17px;
+  padding: 14px 16px;
+}
+
+/* In the page (disabled) but not shown; see StartEndControl. */
+.session-controls .button-collapsed {
+  display: none;
 }
 
 button:focus-visible {
