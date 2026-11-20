@@ -71,11 +71,16 @@ function SessionPage() {
       )}
 
       <div className="session-main">
-        <CameraPreview
-          status={status}
-          hasCamera={camera !== 'error'}
-          switching={session.cameraSwitching}
-        />
+        {/* The gesture toast shows over the preview, where the presenter is
+            already looking to check the camera sees them. */}
+        <div className="session-stage">
+          <CameraPreview
+            status={status}
+            hasCamera={camera !== 'error'}
+            switching={session.cameraSwitching}
+          />
+          <GestureFeedbackToast event={visibleEvent} />
+        </div>
 
         <div className="session-panel">
           {/* Shows the camera in use, so a failed switch shows the camera kept. */}
@@ -98,8 +103,6 @@ function SessionPage() {
           <GestureFeedback status={status} event={visibleEvent} />
         </div>
       </div>
-
-      <GestureFeedbackToast event={visibleEvent} />
     </section>
   )
 }

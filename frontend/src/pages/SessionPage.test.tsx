@@ -86,6 +86,24 @@ describe('SessionPage', () => {
     expect(screen.getAllByText('Next').length).toBeGreaterThan(0)
   })
 
+  it('shows the gesture toast over the camera preview', async () => {
+    await renderPage()
+    await click('Start session', 'Active')
+
+    fakeBackend.emitGesture('next', 0.92)
+
+    const toast = await waitFor(() => {
+      const found = document.querySelector('.gesture-toast')
+      expect(found).not.toBeNull()
+      return found as HTMLElement
+    })
+    expect(toast).toHaveTextContent('Next')
+    // Same box as the preview, so the CSS can place it over its corner.
+    expect(toast.parentElement).toContainElement(
+      screen.getByRole('img', { name: 'Camera preview' }),
+    )
+  })
+
   it('treats no gesture as a normal state, not an error', async () => {
     await renderPage()
     await click('Start session', 'Active')
