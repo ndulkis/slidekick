@@ -7,7 +7,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-from .contracts import SessionState
+from .contracts import SessionEvent, SessionState
 from .gesture_command_controller import GestureCommandController
 from .session_controller import SessionController
 
@@ -34,18 +34,19 @@ class SessionCoordinator:
     def state(self) -> SessionState:
         return self.session.state
 
-    def start(self) -> None:
-        self.session.start()
+    def start(self) -> SessionEvent:
+        event = self.session.start()
         self.last_error = None
+        return event
 
-    def pause(self) -> None:
-        self.session.pause()
+    def pause(self) -> SessionEvent:
+        return self.session.pause()
 
-    def resume(self) -> None:
-        self.session.resume()
+    def resume(self) -> SessionEvent:
+        return self.session.resume()
 
-    def end(self) -> None:
-        self.session.end()
+    def end(self) -> SessionEvent:
+        return self.session.end()
 
     def handle_event(self, event: Mapping[str, Any] | Any) -> bool:
         """Execute only bound gestures during RUNNING; ignore malformed input."""

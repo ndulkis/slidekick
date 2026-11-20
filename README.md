@@ -22,6 +22,7 @@ git clone git@github.com:ndulkis/slidekick.git && cd slidekick
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.lock
+pip install -e .
 npm --prefix frontend ci
 ./scripts/verify.sh
 ```
@@ -33,29 +34,66 @@ git clone git@github.com:ndulkis/slidekick.git; cd slidekick
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.lock
+pip install -e .
 npm --prefix frontend ci
-$env:PYTHONPATH = "src"; python scripts/check_env.py
+python scripts/check_env.py
 ```
 
 - Activate `.venv` in every new terminal.
 - If PowerShell blocks `Activate.ps1`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 - On Windows, run `verify.sh` from Git Bash.
-- After pulling, if the environment check fails, rerun `pip install -r requirements.lock` or `npm --prefix frontend ci`.
+
+## Updating an existing copy
+
+Already cloned SlideKick? After pulling new code, reinstall the dependencies, because new code can add packages. The camera picker, for example, added `cv2-enumerate-cameras` on Windows. Close SlideKick first.
+
+**macOS**
+
+```bash
+cd slidekick
+git pull
+source .venv/bin/activate
+pip install -r requirements.lock
+pip install -e .
+npm --prefix frontend ci
+python scripts/check_env.py
+```
+
+**Windows (PowerShell)**
+
+```powershell
+cd slidekick
+git pull
+.venv\Scripts\Activate.ps1
+pip install -r requirements.lock
+pip install -e .
+npm --prefix frontend ci
+python scripts/check_env.py
+```
+
+Then run `slidekick`. If the environment check still fails, it prints the fix for each problem.
+
+**Choosing a camera:** pick the camera under the preview on the Session page, or on the Settings page. It switches right away, even during a session, and SlideKick remembers it (`data/camera.json`). The picker only appears when there is more than one camera.
+
+- **macOS:** an iPhone nearby with Continuity Camera shows up as a camera. SlideKick uses the Mac's own camera unless you pick the iPhone. If the iPhone locks or goes out of range mid-session, SlideKick switches back to the Mac's camera.
+- **Windows:** cameras are listed by name. Virtual cameras (OBS, Teams, Phone Link) are only used if you pick them.
+- **Linux:** there is no picker. Set `SLIDEKICK_CAMERA_INDEX` in `.env` instead.
+- **Switch failed?** A camera that hasn't sent a picture within 2.5 seconds is skipped, and you keep the camera you had. The terminal prints how long each switch took.
 
 ## Commands
 
-Run from the repo root with `.venv` active. On Windows, set `$env:PYTHONPATH = "src"` instead of the `PYTHONPATH=src` prefix.
+Run from the repo root with `.venv` active. `slidekick` works from any folder.
 
 | Command | What it does |
 | --- | --- |
-| `PYTHONPATH=src python scripts/run_gesture_control.py` | Run SlideKick: webcam gestures control the focused presentation |
-| `PYTHONPATH=src python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
-| `PYTHONPATH=src python scripts/check_env.py` | Check the dev environment and print fixes |
+| `slidekick` | Run SlideKick: the dashboard opens in its own Chrome or Edge window (a browser tab at `localhost:5173/session` if neither is installed; API on `127.0.0.1:5001`). Start a session there to turn on the camera and gesture control. Quit with the dashboard's Quit SlideKick button, by closing that window, or with Ctrl+C in the terminal |
+| `python -m slidekick.recognition.camera` | Camera and recognition only (prints events, no slide control) |
+| `python scripts/check_env.py` | Check the dev environment and print fixes |
 | `./scripts/verify.sh` | Run the environment check plus the main CI checks |
 | `./scripts/checks/<name>.sh` | Run one CI check on its own, e.g. `./scripts/checks/unit-tests.sh` (see `scripts/checks/` for the list) |
 | `python -m pytest` | Run all Python tests |
 | `ruff check .` / `ruff format .` | Lint / format Python |
-| `npm --prefix frontend run dev` | Dashboard dev server on port 5173 |
+| `npm --prefix frontend run dev` | Dashboard dev server only, without the backend (it shows "Can't reach SlideKick") |
 | `npm --prefix frontend run test` / `run lint` | Frontend tests / lint |
 | `python manual_test.py` | Press "next slide" once after 3 seconds, to check slide control |
 
@@ -72,7 +110,7 @@ Every setting is optional. To override one, copy `.env.example` to `.env`. Real 
 | `SLIDEKICK_ENV` | `development` | `development`, `test`, `production` |
 | `SLIDEKICK_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `SLIDEKICK_MODEL_PATH` | `models/gesture_recognizer.task` | Path relative to the repo root |
-| `SLIDEKICK_CAMERA_INDEX` | `0` | `0`, `1`, `2`, ... |
+| `SLIDEKICK_CAMERA_INDEX` | `0` | `0`, `1`, `2`, ... (Linux, or Windows without `cv2-enumerate-cameras`; macOS and Windows use the dashboard's camera picker) |
 | `SLIDEKICK_CAMERA_BACKEND` | `avfoundation` (macOS), `msmf` (Windows), `v4l2` (Linux) | That OS's default, `any`, or `dshow` on Windows |
 
 Never commit real secrets. Add the name to `.env.example` with an empty value, and put CI secrets under GitHub **Settings → Secrets and variables → Actions**.

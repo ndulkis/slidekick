@@ -5,9 +5,6 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
-# Same as CI, so `import slidekick` resolves to src/slidekick.
-export PYTHONPATH=src
-
 steps=()
 failed=0
 
