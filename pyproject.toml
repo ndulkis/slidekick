@@ -6,6 +6,13 @@ dependencies = [
     "Pillow>=10.0",
 ]
 
+[project.scripts]
+slidekick = "slidekick.app:main"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [dependency-groups]
 dev = [
     "bandit>=1.9.4",

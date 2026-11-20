@@ -26,14 +26,20 @@ ruff
 # Provides pip-compile for regenerating requirements.lock.
 pip-tools
 
-pyautogui
-pip-tools
-
+# Presentation keyboard automation
 pyautogui
 
 # Screen capture for the local end-to-end latency test
 # (tests/performance/test_end_to_end_slide_latency.py).
 mss
 
+# Backend HTTP API
 flask
 
+# R04 training job client HTTP requests
+requests
+
+# Lists cameras by name for the dashboard's camera picker on Windows, in the
+# order OpenCV numbers them. macOS uses the built-in system_profiler instead,
+# which avoids this package's pyobjc dependency there.
+cv2_enumerate_cameras; sys_platform == "win32"

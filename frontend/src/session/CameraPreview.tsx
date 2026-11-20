@@ -30,10 +30,11 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
     )
   }
 
-  // The session state model turns the camera off once a session has ended.
-  if (status === 'ended') {
+  // The camera only runs during a session: it is off before the first start
+  // and again once the session has ended.
+  if (status === 'ready' || status === 'ended') {
     return (
-      <div className="camera-preview camera-preview-ended" role="status">
+      <div className={`camera-preview camera-preview-${status}`} role="status">
         Camera off
       </div>
     )
@@ -41,9 +42,11 @@ function CameraPreview({ status, hasCamera }: CameraPreviewProps) {
 
   const label = status === 'paused' ? 'Camera preview (paused)' : 'Camera preview'
 
+  // The backend streams the camera as MJPEG, which an <img> plays natively.
+  // It is only mounted during a session, so each session opens a new stream.
   return (
-    <div className={`camera-preview camera-preview-${status}`} role="status">
-      {label}
+    <div className={`camera-preview camera-preview-live camera-preview-${status}`}>
+      <img src="/api/camera" alt={label} />
     </div>
   )
 }

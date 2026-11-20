@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "name": "presenter_b",
+  "bindings": {
+    "swipe_right": "previous",
+    "swipe_left": "next"
+  }
+}

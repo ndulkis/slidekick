@@ -7,8 +7,9 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
-from .contracts import SessionState
+from .contracts import SessionEvent, SessionState
 from .gesture_command_controller import GestureCommandController
+from .gesture_profile import GestureProfile
 from .session_controller import SessionController
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 class PresentationCommandError(RuntimeError):
     """A mapped presentation command failed to execute."""
+
+
+class ProfileChangeError(RuntimeError):
+    """Refused a gesture profile change."""
 
 
 class SessionCoordinator:
@@ -29,23 +34,36 @@ class SessionCoordinator:
         self.session = session if session is not None else SessionController()
         self.gestures = gestures if gestures is not None else GestureCommandController()
         self.last_error: str | None = None
+        self.profile_name: str | None = None
 
     @property
     def state(self) -> SessionState:
         return self.session.state
 
-    def start(self) -> None:
-        self.session.start()
+    def start(self) -> SessionEvent:
+        event = self.session.start()
         self.last_error = None
+        return event
 
-    def pause(self) -> None:
-        self.session.pause()
+    def pause(self) -> SessionEvent:
+        return self.session.pause()
 
-    def resume(self) -> None:
-        self.session.resume()
+    def resume(self) -> SessionEvent:
+        return self.session.resume()
 
-    def end(self) -> None:
-        self.session.end()
+    def end(self) -> SessionEvent:
+        return self.session.end()
+
+    def apply_profile(self, profile: GestureProfile) -> None:
+        """Apply prevalidated bindings only while the session is not running."""
+        if not isinstance(profile, GestureProfile):
+            raise ProfileChangeError("apply_profile needs a GestureProfile")
+        if self.state is SessionState.RUNNING:
+            raise ProfileChangeError(
+                "Pause the session before changing the gesture profile"
+            )
+        self.gestures.set_gesture_bindings(profile.bindings)
+        self.profile_name = profile.name
 
     def handle_event(self, event: Mapping[str, Any] | Any) -> bool:
         """Execute only bound gestures during RUNNING; ignore malformed input."""

@@ -42,6 +42,28 @@
   margin: 16px 0;
 }
 
+.calibration-actions button {
+  min-height: 44px;
+  padding: 10px 20px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--accent-bg);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.calibration-actions button:hover:not(:disabled) {
+  background: var(--accent-border);
+}
+
+.calibration-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .calibration-status,
 .calibration-error {
   margin: 8px 0;
@@ -56,6 +78,21 @@
 
 .calibration-slider input[type='range']:focus-visible,
 .calibration-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.binding-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 0;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.binding-row select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

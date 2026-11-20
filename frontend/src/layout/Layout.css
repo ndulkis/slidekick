@@ -35,6 +35,10 @@
   border-bottom-color: var(--accent);
 }
 
+.app-quit {
+  margin-left: auto;
+}
+
 .app-content {
   flex: 1;
   padding: 24px;
