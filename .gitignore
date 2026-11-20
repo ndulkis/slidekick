@@ -220,3 +220,4 @@ __marimo__/
 # Calibration and camera choice saved from the dashboard
 data/calibration.json
 data/camera.json
+data/gesture_bindings.json
