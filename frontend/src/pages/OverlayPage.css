@@ -3,13 +3,27 @@
   background: transparent;
 }
 
+/* Fills the window, with the content pushed into the screen corner it sits in. */
 .overlay {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  height: 100vh;
   /* The robot icons overhang their pills (negative margins), so leave room. */
   gap: 20px;
   padding: 16px 8px;
+}
+
+.overlay-top-left,
+.overlay-bottom-left {
+  align-items: flex-start;
+}
+
+/* At the bottom, the status sits nearest the screen edge, below the feedback. */
+.overlay-bottom-left,
+.overlay-bottom-right {
+  flex-direction: column-reverse;
 }
 
 .overlay .gesture-toast {

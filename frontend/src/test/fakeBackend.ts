@@ -3,7 +3,7 @@
 // SessionController; the real ones are tested in tests/unit/test_session_controller.py.
 import type { SessionState } from '../core/sessionContracts'
 import type { CameraStatus } from '../core/useSession'
-import type { Gesture } from '../session/types'
+import type { Gesture, OverlaySettings } from '../session/types'
 import { DEFAULT_CALIBRATION, toBackend } from '../settings/calibrationSettings'
 
 const TRANSITIONS = {
@@ -39,6 +39,7 @@ function initial() {
     /** Set by POST /api/quit. */
     hasQuit: false,
     gestureId: 0,
+    overlay: { enabled: true, position: 'top-right' } as OverlaySettings,
   }
 }
 
@@ -63,6 +64,7 @@ function status() {
     camera_message: fakeBackend.cameraMessage,
     camera_id: fakeBackend.camera === 'off' ? null : fakeBackend.selectedCamera,
     camera_switching: fakeBackend.cameraSwitching,
+    overlay: fakeBackend.overlay,
   }
 }
 
@@ -139,6 +141,13 @@ export function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise
   if (path === '/api/bindings/reset' && method === 'POST') {
     fakeBackend.bindings = { swipe_right: 'next', swipe_left: 'previous' }
     return json(bindingsBody())
+  }
+  if (path === '/api/overlay') {
+    if (method === 'GET') return json(fakeBackend.overlay)
+    if (method === 'PUT') {
+      fakeBackend.overlay = JSON.parse(String(init?.body)) as OverlaySettings
+      return json(fakeBackend.overlay)
+    }
   }
   if (path === '/api/cameras') {
     const cameras = () => ({ cameras: fakeBackend.cameras, selected: fakeBackend.selectedCamera })

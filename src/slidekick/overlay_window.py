@@ -13,9 +13,19 @@ from typing import Any
 import webview
 
 WIDTH, HEIGHT = 300, 160
-# ponytail: fixed top-right corner of the main screen. Make it configurable
-# (or follow the presenter-view screen) if it covers slide content.
+# ponytail: corners of the main screen only. Follow the presenter-view screen
+# if presenters want it off the audience's display.
 MARGIN = 24
+
+
+def corner(position: str, screen_width: int, screen_height: int) -> tuple[int, int]:
+    """Top-left x, y of the window in a corner of the screen. The positions
+    are api_server.OVERLAY_POSITIONS; anything else falls back to top-right.
+    """
+    vertical, _, horizontal = position.partition("-")
+    x = MARGIN if horizontal == "left" else screen_width - WIDTH - MARGIN
+    y = screen_height - HEIGHT - MARGIN if vertical == "bottom" else MARGIN
+    return x, y
 
 
 def float_over_slideshow_macos(window: webview.Window) -> None:
@@ -69,6 +79,7 @@ def on_shown(window: webview.Window) -> None:
 
 def main(url: str) -> None:
     screen = webview.screens[0]  # also loads the GUI backend
+    x, y = corner("top-right", screen.width, screen.height)
     if sys.platform == "darwin":
         import AppKit
 
@@ -82,8 +93,8 @@ def main(url: str) -> None:
         url,
         width=WIDTH,
         height=HEIGHT,
-        x=screen.width - WIDTH - MARGIN,
-        y=MARGIN,
+        x=x,
+        y=y,
         frameless=True,
         on_top=True,
         transparent=True,
@@ -93,6 +104,15 @@ def main(url: str) -> None:
     )
     # The native window exists once shown.
     window.events.shown += lambda: on_shown(window)
+
+    def place(position: str) -> None:
+        """Called by the overlay page (window.pywebview.api.place) when it
+        loads and whenever the position in Settings changes.
+        """
+        screen = webview.screens[0]
+        window.move(*corner(str(position), screen.width, screen.height))
+
+    window.expose(place)
     webview.start()
 
 

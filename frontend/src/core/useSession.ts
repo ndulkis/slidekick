@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Gesture } from '../session/types'
+import type { Gesture, OverlaySettings } from '../session/types'
 import { api } from './api'
 import type { SessionEvent, SessionEventType, SessionState } from './sessionContracts'
 
@@ -28,6 +28,8 @@ type StatusBody = {
   camera_id?: string | null
   /** A new camera is opening; the old one streams until it is. */
   camera_switching?: boolean
+  /** Whether and where the overlay shows over the slideshow. */
+  overlay?: OverlaySettings
 }
 
 type ActionBody = StatusBody & {
@@ -50,6 +52,7 @@ export function useSession() {
   const [cameraId, setCameraId] = useState<string | null>(null)
   const [cameraSwitching, setCameraSwitching] = useState(false)
   const [lastGesture, setLastGesture] = useState<LastGesture | null>(null)
+  const [overlay, setOverlay] = useState<OverlaySettings | null>(null)
 
   const apply = useCallback((body: StatusBody) => {
     setConnection('connected')
@@ -59,6 +62,13 @@ export function useSession() {
     setCameraMessage(body.camera_message ?? null)
     setCameraId(body.camera_id ?? null)
     setCameraSwitching(body.camera_switching ?? false)
+    const nextOverlay = body.overlay ?? null
+    // Same object while unchanged, so a poll doesn't re-render or re-place it.
+    setOverlay((prev) =>
+      prev?.enabled === nextOverlay?.enabled && prev?.position === nextOverlay?.position
+        ? prev
+        : nextOverlay,
+    )
     const next = body.last_gesture
     // Keep the same object while the id is unchanged, so polling doesn't
     // look like a new gesture (the toast re-shows on every new object).
@@ -118,6 +128,7 @@ export function useSession() {
     cameraId,
     cameraSwitching,
     lastGesture,
+    overlay,
     start: useCallback(() => act('start'), [act]),
     pause: useCallback(() => act('pause'), [act]),
     resume: useCallback(() => act('resume'), [act]),

@@ -58,6 +58,7 @@ def test_session_lifecycle_and_gestures(tmp_path):
         "camera_message": None,
         "camera_id": None,
         "camera_switching": False,
+        "overlay": {"enabled": True, "position": "top-right"},
     }
 
     res = post(client, "/api/session/start")
@@ -132,6 +133,42 @@ def test_calibration_validation(tmp_path):
         assert client.put("/api/calibration", json=body).status_code == 400, body
     assert backend.calibration.min_displacement == 0.10
     assert not (tmp_path / "calibration.json").exists()
+
+
+def test_overlay_settings_round_trip_and_persistence(tmp_path):
+    client, backend, _ = make_client(tmp_path)
+    backend.overlay_path = tmp_path / "overlay.json"
+    assert client.get("/api/overlay").json == {"enabled": True, "position": "top-right"}
+
+    setting = {"enabled": False, "position": "bottom-left"}
+    assert client.put("/api/overlay", json=setting).json == setting
+    # The overlay page reads it from the status it already polls.
+    assert client.get("/api/session").json["overlay"] == setting
+    assert json.loads((tmp_path / "overlay.json").read_text()) == setting
+
+    restarted = Backend(SessionCoordinator(), overlay_path=tmp_path / "overlay.json")
+    assert restarted.overlay == setting
+
+
+def test_overlay_settings_validation(tmp_path):
+    client, backend, _ = make_client(tmp_path)
+    backend.overlay_path = tmp_path / "overlay.json"
+    bad = [
+        {"enabled": True, "position": "middle"},
+        {"enabled": "yes", "position": "top-left"},
+        {"enabled": True},
+        {"enabled": True, "position": "top-left", "extra": 1},
+        ["top-left"],
+    ]
+    for body in bad:
+        assert client.put("/api/overlay", json=body).status_code == 400, body
+    assert backend.overlay == {"enabled": True, "position": "top-right"}
+    assert not (tmp_path / "overlay.json").exists()
+
+    # A corrupt file falls back to the defaults.
+    (tmp_path / "overlay.json").write_text("{not json")
+    corrupt = Backend(SessionCoordinator(), overlay_path=tmp_path / "overlay.json")
+    assert corrupt.overlay == {"enabled": True, "position": "top-right"}
 
 
 def test_camera_follows_the_session(tmp_path):

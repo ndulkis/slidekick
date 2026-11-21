@@ -57,6 +57,40 @@ SESSION_ACTIONS = ("start", "pause", "resume", "end")
 ALLOWED_HOSTNAMES = {"127.0.0.1", "localhost"}
 
 
+# Corners of the main screen the presentation overlay can sit in. Must match
+# overlayPositions in frontend/src/session/types.ts and corner() in
+# overlay_window.py.
+OVERLAY_POSITIONS = ("top-left", "top-right", "bottom-left", "bottom-right")
+DEFAULT_OVERLAY = {"enabled": True, "position": "top-right"}
+
+
+class OverlayError(ValueError):
+    """The submitted overlay settings are malformed."""
+
+
+def parse_overlay(data: Any) -> dict[str, Any]:
+    """Validated overlay settings. Raises OverlayError."""
+    if not isinstance(data, dict) or set(data) != set(DEFAULT_OVERLAY):
+        raise OverlayError("Expected exactly: enabled, position")
+    if not isinstance(data["enabled"], bool):
+        raise OverlayError("enabled must be true or false")
+    if data["position"] not in OVERLAY_POSITIONS:
+        raise OverlayError(f"position must be one of {OVERLAY_POSITIONS}")
+    return {"enabled": data["enabled"], "position": data["position"]}
+
+
+def load_overlay(path: Path | None) -> dict[str, Any]:
+    """The saved overlay settings, or the defaults if missing or bad."""
+    try:
+        return (
+            parse_overlay(json.loads(path.read_text()))
+            if path
+            else dict(DEFAULT_OVERLAY)
+        )
+    except (OSError, json.JSONDecodeError, OverlayError):
+        return dict(DEFAULT_OVERLAY)
+
+
 class CalibrationError(ValueError):
     """The submitted calibration is malformed or fails GestureCalibration checks."""
 
@@ -116,6 +150,7 @@ class Backend:
         camera_path: Path | None = None,
         profile_dir: Path | None = None,
         bindings_path: Path | None = None,
+        overlay_path: Path | None = None,
     ) -> None:
         self.coordinator = coordinator
         self.profile_store = (
@@ -131,6 +166,9 @@ class Backend:
         # when an iPhone connects or disconnects.
         self.camera_path = camera_path
         self.camera_id = load_camera_id(camera_path)
+        # Shown, and where, by the overlay over the slideshow.
+        self.overlay_path = overlay_path
+        self.overlay = load_overlay(overlay_path)
         # The camera the loop should use, a list_cameras() entry. The camera
         # loop switches whenever its id changes.
         self.active_camera: dict[str, Any] | None = None
@@ -373,6 +411,17 @@ class Backend:
         self.calibration = calibration
         return calibration
 
+    def set_overlay(self, data: Any) -> dict[str, Any]:
+        overlay = parse_overlay(data)
+        # Two quick clicks are two requests on different threads; the lock
+        # keeps the saved file and the served setting the same one.
+        with self._lock:
+            if self.overlay_path is not None:
+                self.overlay_path.parent.mkdir(parents=True, exist_ok=True)
+                self.overlay_path.write_text(json.dumps(overlay))
+            self.overlay = overlay
+        return overlay
+
     def profiles(self) -> dict[str, Any]:
         with self._lock:
             entries = self.profile_store.list_profiles() if self.profile_store else []
@@ -436,6 +485,8 @@ class Backend:
                 # A new camera is opening; the old one streams until it is.
                 "camera_switching": self._switching_from is not None
                 and self.camera in ("starting", "ready"),
+                # The overlay page polls this, so changes apply within a poll.
+                "overlay": self.overlay,
             }
 
 
@@ -530,6 +581,17 @@ def create_app(backend: Backend) -> Flask:
         except CalibrationError as exc:
             return jsonify(error=str(exc)), 400
         return jsonify(calibration_fields(calibration))
+
+    @app.get("/api/overlay")
+    def get_overlay():
+        return jsonify(backend.overlay)
+
+    @app.put("/api/overlay")
+    def put_overlay():
+        try:
+            return jsonify(backend.set_overlay(request.get_json()))
+        except OverlayError as exc:
+            return jsonify(error=str(exc)), 400
 
     @app.get("/api/profiles")
     def get_profiles():

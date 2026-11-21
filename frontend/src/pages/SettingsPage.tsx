@@ -3,6 +3,7 @@ import CameraPicker from '../settings/CameraPicker'
 import GestureProfileSection from '../settings/GestureProfileSection'
 import GestureBindingsSection from '../settings/GestureBindingsSection'
 import GestureCalibrationSection from '../settings/GestureCalibrationSection'
+import OverlaySection from '../settings/OverlaySection'
 import './SettingsPage.css'
 
 function SettingsPage() {
@@ -26,6 +27,8 @@ function SettingsPage() {
       <GestureCalibrationSection />
 
       <GestureBindingsSection />
+
+      <OverlaySection />
     </section>
   )
 }

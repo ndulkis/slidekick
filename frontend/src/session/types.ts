@@ -16,6 +16,23 @@ export interface RecognitionEvent {
   confidence?: number
 }
 
+/** Corners the presentation overlay can sit in. Must match OVERLAY_POSITIONS in api_server.py. */
+export const overlayPositions = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const
+
+export type OverlayPosition = (typeof overlayPositions)[number]
+
+export interface OverlaySettings {
+  enabled: boolean
+  position: OverlayPosition
+}
+
+export const overlayPositionLabels: Record<OverlayPosition, string> = {
+  'top-left': 'Top left',
+  'top-right': 'Top right',
+  'bottom-left': 'Bottom left',
+  'bottom-right': 'Bottom right',
+}
+
 export const gestureLabels: Record<Gesture, string> = {
   next: 'Next',
   previous: 'Previous',
