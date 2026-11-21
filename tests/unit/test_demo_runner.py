@@ -79,6 +79,7 @@ def test_dashboard_opens_in_an_app_window_when_chrome_is_available(
     monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/bin/node")
     monkeypatch.setattr(runner, "wait_for_port", lambda port: True)
 
+    monkeypatch.setattr(runner, "overlay_command", lambda url: None)
     monkeypatch.setattr(runner, "native_window_command", lambda url, work_dir: None)
     monkeypatch.setattr(runner, "find_app_browser", lambda: "/chrome")
     assert len(runner.start_dashboard("/tmp/profile")) == 2
@@ -105,6 +106,18 @@ def test_dashboard_opens_in_an_app_window_when_chrome_is_available(
     assert "--open" not in launched[0]
     assert launched[1] == ["native", "http://localhost:5173/session"]
 
+    # With pywebview: the overlay floats over the slideshow too.
+    launched.clear()
+    monkeypatch.setattr(runner, "overlay_command", lambda url: ["overlay", url])
+    assert len(runner.start_dashboard("/tmp/profile")) == 3
+    assert launched[2] == ["overlay", "http://localhost:5173/overlay"]
+
+    # No app window (a browser tab): no overlay either.
+    launched.clear()
+    monkeypatch.setattr(runner, "native_window_command", lambda url, work_dir: None)
+    monkeypatch.setattr(runner, "find_app_browser", lambda: None)
+    assert len(runner.start_dashboard("/tmp/profile")) == 1
+
 
 def test_closing_the_native_window_quits_at_once(monkeypatch, tmp_path):
     vite = tmp_path / "frontend/node_modules/vite/bin/vite.js"
@@ -116,6 +129,7 @@ def test_closing_the_native_window_quits_at_once(monkeypatch, tmp_path):
     monkeypatch.setattr(
         runner, "native_window_command", lambda url, work_dir: ["native"]
     )
+    monkeypatch.setattr(runner, "overlay_command", lambda url: None)
     window_closed = threading.Event()
     window = Mock(wait=window_closed.wait)
     monkeypatch.setattr(runner.subprocess, "Popen", Mock(side_effect=[Mock(), window]))

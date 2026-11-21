@@ -45,5 +45,6 @@ requests
 cv2_enumerate_cameras; sys_platform == "win32"
 
 # The dashboard's native window on macOS (dashboard_window.py), so the Dock
-# shows SlideKick's icon. Windows keeps the Chrome/Edge app window.
-pywebview; sys_platform == "darwin"
+# shows SlideKick's icon, and the presentation overlay (overlay_window.py) on
+# macOS and Windows. Windows keeps the Chrome/Edge app window for the dashboard.
+pywebview; sys_platform == "darwin" or sys_platform == "win32"

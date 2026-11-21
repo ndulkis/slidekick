@@ -44,5 +44,5 @@ warn_unused_configs = true
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["mediapipe", "webview", "AppKit", "Foundation"]
+module = ["mediapipe", "webview", "AppKit", "Foundation", "PyObjCTools"]
 ignore_missing_imports = true

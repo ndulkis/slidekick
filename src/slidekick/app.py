@@ -59,6 +59,15 @@ def native_window_command(url: str, work_dir: str) -> list[str] | None:
     return [window_python(work_dir), "-m", "slidekick.dashboard_window", url]
 
 
+def overlay_command(url: str) -> list[str] | None:
+    """The command that floats the session overlay (overlay_window.py) over
+    the slideshow. None where pywebview is not installed (Linux).
+    """
+    if importlib.util.find_spec("webview") is None:
+        return None
+    return [sys.executable, "-m", "slidekick.overlay_window", url]
+
+
 def window_python(work_dir: str) -> str:
     """Python as the executable of a throwaway SlideKick.app in work_dir. The
     Dock takes an app's name and icon from the bundle its executable is in,
@@ -165,6 +174,8 @@ def start_dashboard(
             else None,
         )
         processes.append(window)
+        if overlay := overlay_command(f"http://localhost:{DASHBOARD_PORT}/overlay"):
+            processes.append(subprocess.Popen(overlay))  # nosec B603
         if native and on_window_closed is not None:
             threading.Thread(
                 target=lambda: (window.wait(), on_window_closed()), daemon=True
@@ -195,9 +206,10 @@ def main():
         # Closing the native window quits at once, even with other dashboard
         # pages (a browser tab) still open.
         processes = start_dashboard(profile_dir, on_window_closed=backend.quit)
-        # Only with the app window (vite + window). A normal browser tab may
-        # be suspended by the browser, which must not quit a presentation.
-        backend.quit_when_dashboard_closes = len(processes) == 2
+        # Only with the app window (vite + window, maybe + overlay). A normal
+        # browser tab may be suspended by the browser, which must not quit a
+        # presentation.
+        backend.quit_when_dashboard_closes = len(processes) >= 2
         print("Start a session from the dashboard. Quit there, or with Ctrl+C.")
         try:
             while not backend.quitting:

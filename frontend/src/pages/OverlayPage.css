@@ -1,0 +1,17 @@
+/* All CSS ships in one bundle, so scope the transparency to the overlay page. */
+:root:has(.overlay) {
+  background: transparent;
+}
+
+.overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  /* The robot icons overhang their pills (negative margins), so leave room. */
+  gap: 20px;
+  padding: 16px 8px;
+}
+
+.overlay .gesture-toast {
+  position: static;
+}
