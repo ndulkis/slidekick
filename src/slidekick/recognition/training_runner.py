@@ -21,6 +21,7 @@ def run_training_job(
     job: TrainingJob,
     python_executable: Path,
     training_script: Path,
+    manifest_path: Path | None = None,
 ) -> TrainingRunResult:
     """Execute Model Maker training and verify the exported artifact."""
 
@@ -37,6 +38,12 @@ def run_training_job(
         "--export-dir",
         str(job.export_dir),
     ]
+
+    if manifest_path is not None:
+        if not manifest_path.is_file():
+            raise ValueError(f"Training manifest does not exist: {manifest_path}")
+
+        command.extend(["--manifest-path", str(manifest_path)])
 
     completed = subprocess.run(  # nosec B603 - Trusted interpreter and script paths.
         command,
@@ -92,6 +99,7 @@ def run_wsl_training_job(
     job: TrainingJob,
     wsl_python: str,
     wsl_training_script: str,
+    manifest_path: Path | None = None,
 ) -> TrainingRunResult:
     """Launch a training job inside WSL from the Windows application."""
 
@@ -99,6 +107,14 @@ def run_wsl_training_job(
 
     dataset_dir = windows_path_to_wsl(job.dataset_dir)
     export_dir = windows_path_to_wsl(job.export_dir)
+
+    wsl_manifest_path = None
+
+    if manifest_path is not None:
+        if not manifest_path.is_file():
+            raise ValueError(f"Training manifest does not exist: {manifest_path}")
+
+        wsl_manifest_path = windows_path_to_wsl(manifest_path)
 
     command = [
         "wsl.exe",
@@ -110,6 +126,9 @@ def run_wsl_training_job(
         "--export-dir",
         export_dir,
     ]
+
+    if wsl_manifest_path is not None:
+        command.extend(["--manifest-path", wsl_manifest_path])
 
     completed = subprocess.run(  # nosec B603 - Trusted WSL training configuration.
         command,
