@@ -3,3 +3,5 @@ mediapipe==0.10.21
 tensorflow==2.15.1
 numpy==1.26.4
 pillow==12.3.0
+setuptools==80.9.0
+tensorflow-metadata==1.17.3
