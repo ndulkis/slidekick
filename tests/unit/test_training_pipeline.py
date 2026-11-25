@@ -460,3 +460,77 @@ def test_pipeline_evaluation_failure_prevents_activation(
 
     activation.assert_not_called()
     assert active_path.read_bytes() == b"existing-working-model"
+
+
+def test_pipeline_rejected_candidate_preserves_active_model(
+    training_job: TrainingJob,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A trained model failing acceptance must never replace the active model."""
+
+    from slidekick.recognition import training_pipeline
+
+    candidate_path = training_job.export_dir / "gesture_recognizer.task"
+    evaluation_dir = training_job.export_dir / "partitions" / "test"
+
+    active_path = tmp_path / "active.task"
+    backup_path = tmp_path / "backup.task"
+
+    active_path.write_bytes(b"existing-working-model")
+    original_bytes = active_path.read_bytes()
+
+    # Simulate successful Model Maker training.
+    def fake_runner(job):
+        evaluation_dir.mkdir(parents=True)
+        candidate_path.write_bytes(b"new-candidate-model")
+
+        return TrainingRunResult(
+            job_id=job.job_id,
+            profile_id=job.profile_id,
+            model_path=candidate_path,
+            stdout="Training completed",
+        )
+
+    # Simulate evaluation after training produces the candidate model.
+    def fake_evaluation(model_path, evaluation_dir, labels):
+        return evaluated_candidate(
+            model_path,
+            accepted=False,
+        )
+
+    evaluation = Mock(side_effect=fake_evaluation)
+    activation = Mock()
+
+    monkeypatch.setattr(
+        training_pipeline,
+        "evaluate_candidate_model",
+        evaluation,
+    )
+    monkeypatch.setattr(
+        training_pipeline,
+        "activate_model",
+        activation,
+    )
+
+    with pytest.raises(ValueError, match="Candidate model rejected"):
+        run_training_pipeline(
+            job=training_job,
+            runner=fake_runner,
+            criteria=acceptance_criteria(),
+            new_gesture="thumbs_up",
+            existing_gestures=["pinch"],
+            active_path=active_path,
+            backup_path=backup_path,
+        )
+
+    # Training succeeded, but the candidate was rejected.
+    evaluation.assert_called_once()
+    activation.assert_not_called()
+
+    # The previously active model must remain untouched.
+    assert active_path.read_bytes() == original_bytes
+    assert not backup_path.exists()
+
+    # The rejected candidate still exists for debugging.
+    assert candidate_path.read_bytes() == b"new-candidate-model"
