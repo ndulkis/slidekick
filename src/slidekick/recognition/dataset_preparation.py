@@ -147,14 +147,6 @@ def prepare_training_dataset(
     if resolved_output.is_relative_to(negative_dir.resolve()):
         raise ValueError("Training output cannot be inside negative dataset")
 
-    resolved_output = output_dir.resolve()
-
-    if resolved_output.is_relative_to(enrollment_root):
-        raise ValueError("Training output cannot be inside enrollment directory")
-
-    if resolved_output.is_relative_to(negative_dir.resolve()):
-        raise ValueError("Training output cannot be inside negative dataset")
-
     # Prepare the destination directories.
     output_dir.mkdir(parents=True, exist_ok=False)
 

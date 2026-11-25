@@ -8,6 +8,7 @@ from time import perf_counter
 from uuid import uuid4
 
 from dataset_validator import validate_dataset
+from partition_dataset import prepare_partitions
 from training_config import TrainingConfig
 
 # Measure MediaPipe Model Maker import time
@@ -49,6 +50,7 @@ def train_model(
     dataset_dir: Path,
     export_dir: Path,
     config: TrainingConfig,
+    manifest_path: Path | None = None,
 ) -> TrainingResult:
     total_start = perf_counter()
     timings: dict[str, float] = {}
@@ -61,25 +63,75 @@ def train_model(
     print(f"Dataset classes: {validation.class_counts}")
     print(f"Total image files: {validation.total_samples}")
 
-    # Step 1: Load labeled images and extract hand landmarks
-    print("Loading and preprocessing image dataset...")
+    # Step 1: Prepare independent partitions when a manifest is available.
+    if manifest_path is not None:
+        print("Preparing capture-group-aware partitions...")
 
-    start_time = perf_counter()
+        start_time = perf_counter()
 
-    data = gesture_recognizer.Dataset.from_folder(
-        dirname=str(dataset_dir),
-        hparams=gesture_recognizer.HandDataPreprocessingParams(),
-    )
+        partitions = prepare_partitions(
+            dataset_dir=dataset_dir,
+            manifest_path=manifest_path,
+            output_dir=export_dir / "partitions",
+        )
 
-    timings["preprocessing"] = report_duration("Dataset preprocessing", start_time)
+        timings["splitting"] = report_duration("Capture-group partitioning", start_time)
 
-    print(f"Usable samples: {len(data)}")
-    print(f"Labels: {data.label_names}")
+        # Step 2: Preprocess each partition independently.
+        print("Preprocessing training, validation, and test datasets...")
+        start_time = perf_counter()
 
-    # Step 2: Split dataset into training, validation, and testing
-    start_time = perf_counter()
-    train_data, remaining_data = data.split(0.8)
-    validation_data, test_data = remaining_data.split(0.5)
+        def load_partition(directory: Path):
+            return gesture_recognizer.Dataset.from_folder(
+                dirname=str(directory),
+                hparams=gesture_recognizer.HandDataPreprocessingParams(),
+            )
+
+        train_data = load_partition(partitions.train)
+        validation_data = load_partition(partitions.validation)
+        test_data = load_partition(partitions.test)
+
+        # All partitions must agree on their class-to-index mapping.
+        labels = list(train_data.label_names)
+
+        if (
+            list(validation_data.label_names) != labels
+            or list(test_data.label_names) != labels
+        ):
+            raise ValueError("Dataset partitions have inconsistent label mappings")
+
+        if set(labels) != set(validation.class_counts):
+            raise ValueError("Preprocessed labels do not match source gesture classes")
+
+        timings["preprocessing"] = report_duration("Dataset preprocessing", start_time)
+
+    else:
+        # Legacy prototype mode: individual images are split randomly.
+        # These results must not be presented as independent benchmarks.
+        print(
+            "WARNING: No capture-group manifest provided. "
+            "Using legacy image-level splitting."
+        )
+
+        print("Loading and preprocessing image dataset...")
+        start_time = perf_counter()
+
+        data = gesture_recognizer.Dataset.from_folder(
+            dirname=str(dataset_dir),
+            hparams=gesture_recognizer.HandDataPreprocessingParams(),
+        )
+
+        timings["preprocessing"] = report_duration("Dataset preprocessing", start_time)
+
+        print(f"Usable samples: {len(data)}")
+        print(f"Labels: {data.label_names}")
+
+        start_time = perf_counter()
+
+        train_data, remaining_data = data.split(0.8)
+        validation_data, test_data = remaining_data.split(0.5)
+
+        timings["splitting"] = report_duration("Dataset splitting", start_time)
 
     print(f"Training samples: {len(train_data)}")
     print(f"Validation samples: {len(validation_data)}")
@@ -87,8 +139,6 @@ def train_model(
 
     if min(len(train_data), len(validation_data), len(test_data)) == 0:
         raise ValueError("Dataset too small after preprocessing")
-
-    timings["splitting"] = report_duration("Dataset splitting", start_time)
 
     # Step 3: Configure training hyperparameters
     hparams = gesture_recognizer.HParams(
@@ -179,6 +229,13 @@ def main():
     )
 
     parser.add_argument(
+        "--manifest-path",
+        type=Path,
+        default=None,
+        help="Capture-group manifest for independent dataset splitting.",
+    )
+
+    parser.add_argument(
         "--export-dir",
         type=Path,
         default=None,
@@ -202,6 +259,7 @@ def main():
         dataset_dir=args.dataset_dir,
         export_dir=export_dir,
         config=config,
+        manifest_path=args.manifest_path,
     )
 
     print(f"Training result: {result}")
