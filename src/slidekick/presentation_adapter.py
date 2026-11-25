@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .security_logging import log_security_event
+
 
 def _press_key(key: str) -> None:
     """Load PyAutoGUI only when a real keyboard command is executed."""
@@ -81,6 +83,13 @@ class KeyboardPresentationAdapter(PresentationAdapter):
         action = commands.get(normalized_command)
 
         if action is None:
+            log_security_event(
+                event_type="command_rejected",
+                component="presentation_adapter",
+                severity="WARNING",
+                outcome="rejected",
+            )
+
             return {
                 "status": "error",
                 "error": "Invalid Command",

@@ -3,6 +3,7 @@
 Expected failures document gaps identified during the interim assessment.
 """
 
+import json
 import logging
 from unittest.mock import Mock, patch
 
@@ -15,31 +16,39 @@ from windows_helper import app
 
 
 def require_event(caplog, event_type):
-    """Assert that the specified event appears with required fields."""
-    required_fields = (
+    """Verify a structured security event and return its contents."""
+    required_fields = {
         "timestamp_utc",
         "event_type",
         "component",
         "severity",
         "outcome",
-    )
+    }
 
-    matching_records = [
-        record for record in caplog.records if event_type in record.getMessage()
-    ]
+    for record in caplog.records:
+        try:
+            event = json.loads(record.getMessage())
+        except (json.JSONDecodeError, TypeError):
+            continue
 
-    assert matching_records, f"Missing security event: {event_type}"
+        if not isinstance(event, dict):
+            continue
 
-    message = matching_records[-1].getMessage()
+        if event.get("event_type") != event_type:
+            continue
 
-    for field in required_fields:
-        assert field in message, f"Missing security field: {field}"
+        assert required_fields <= event.keys()
+        assert isinstance(event["timestamp_utc"], str)
+        assert isinstance(event["component"], str)
+        assert event["severity"] in {"INFO", "WARNING", "ERROR", "CRITICAL"}
+        assert event["outcome"] in {"rejected", "failed"}
+        assert record.levelname == event["severity"]
+
+        return event
+
+    pytest.fail(f"Missing structured security event: {event_type}")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="LOG01: rejected commands lack structured security logging",
-)
 def test_t01_invalid_command_generates_security_log(caplog):
     """T01: Unsupported commands must generate rejection events."""
     adapter = KeyboardPresentationAdapter()
@@ -51,10 +60,6 @@ def test_t01_invalid_command_generates_security_log(caplog):
     require_event(caplog, "command_rejected")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="LOG01: native helper failures lack structured security events",
-)
 def test_t02_native_helper_failure_generates_security_log(caplog):
     """T02: Helper execution failures must produce a security event."""
     with (
@@ -73,10 +78,6 @@ def test_t02_native_helper_failure_generates_security_log(caplog):
     require_event(caplog, "native_execution_failed")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="LOG01: malformed events are rejected without security logs",
-)
 def test_t03_malformed_gesture_generates_security_log(caplog):
     """T03: Malformed gesture input must be observable."""
     coordinator = SessionCoordinator()

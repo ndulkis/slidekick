@@ -10,6 +10,7 @@ from typing import Any
 from .contracts import SessionEvent, SessionState
 from .gesture_command_controller import GestureCommandController
 from .gesture_profile import GestureProfile
+from .security_logging import log_security_event
 from .session_controller import SessionController
 
 logger = logging.getLogger(__name__)
@@ -67,16 +68,36 @@ class SessionCoordinator:
 
     def handle_event(self, event: Mapping[str, Any] | Any) -> bool:
         """Execute only bound gestures during RUNNING; ignore malformed input."""
-        if self.state is not SessionState.RUNNING or not isinstance(event, Mapping):
+
+        if self.state is not SessionState.RUNNING:
             return False
+
+        if not isinstance(event, Mapping):
+            log_security_event(
+                event_type="malformed_event",
+                component="session_coordinator",
+                severity="WARNING",
+                outcome="rejected",
+            )
+            return False
+
         if event.get("event_type") != "gesture":
             return False
+
         gesture = event.get("gesture")
-        if (
-            not isinstance(gesture, str)
-            or gesture not in self.gestures.gesture_bindings
-        ):
+
+        if not isinstance(gesture, str):
+            log_security_event(
+                event_type="malformed_event",
+                component="session_coordinator",
+                severity="WARNING",
+                outcome="rejected",
+            )
             return False
+
+        if gesture not in self.gestures.gesture_bindings:
+            return False
+
         try:
             result = self.gestures.handle_event(dict(event))
         except Exception as exc:

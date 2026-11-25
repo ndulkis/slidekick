@@ -3,6 +3,7 @@
 from flask import Flask, Response, jsonify
 
 from slidekick.presentation_adapter import KeyboardPresentationAdapter
+from slidekick.security_logging import log_security_event
 
 app = Flask(__name__)
 adapter = KeyboardPresentationAdapter()
@@ -11,6 +12,18 @@ adapter = KeyboardPresentationAdapter()
 def _build_response(command: str) -> tuple[Response, int]:
     """Execute a command and format the Flask JSON response."""
     result = adapter.execute_command(command)
+
+    if (
+        result.get("status") == "error"
+        and result.get("error") == "Native Execution Error"
+    ):
+        log_security_event(
+            event_type="native_execution_failed",
+            component="windows_helper",
+            severity="ERROR",
+            outcome="failed",
+        )
+
     status_code = 200 if result.get("status") == "success" else 500
     return jsonify(result), status_code
 
