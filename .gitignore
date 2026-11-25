@@ -221,3 +221,5 @@ __marimo__/
 data/calibration.json
 data/camera.json
 data/gesture_bindings.json
+
+/training/smoke_test_output/

@@ -243,3 +243,77 @@ def test_wsl_runner_rejects_missing_manifest(tmp_path: Path) -> None:
         )
 
     mock_run.assert_not_called()
+
+
+def test_repo_runner_uses_repository_training_environment(
+    tmp_path: Path,
+) -> None:
+    """Repository runner must discover its own interpreter and script."""
+
+    from unittest.mock import Mock
+
+    from slidekick.recognition import training_runner
+
+    job = make_job(tmp_path)
+
+    repository_root = Path(training_runner.__file__).resolve().parents[3]
+
+    expected_python = repository_root / "training" / ".venv" / "bin" / "python"
+    expected_script = repository_root / "training" / "scripts" / "train_prototype.py"
+
+    expected_result = Mock()
+
+    with (
+        patch(
+            "slidekick.recognition.training_runner.windows_path_to_wsl",
+            side_effect=lambda path: f"/converted/{path.name}",
+        ) as convert_path,
+        patch(
+            "slidekick.recognition.training_runner.run_wsl_training_job",
+            return_value=expected_result,
+        ) as run_job,
+    ):
+        result = training_runner.run_repo_wsl_training_job(job)
+
+    assert convert_path.call_count == 2
+
+    assert convert_path.call_args_list[0].args[0] == expected_python
+    assert convert_path.call_args_list[1].args[0] == expected_script
+
+    run_job.assert_called_once_with(
+        job=job,
+        wsl_python="/converted/python",
+        wsl_training_script="/converted/train_prototype.py",
+        manifest_path=None,
+    )
+
+    assert result is expected_result
+
+
+def test_repo_runner_forwards_capture_group_manifest(
+    tmp_path: Path,
+) -> None:
+    """The repository runner must preserve grouped-training metadata."""
+
+    from slidekick.recognition import training_runner
+
+    job = make_job(tmp_path)
+
+    manifest_path = tmp_path / "capture_groups.json"
+    manifest_path.write_text('{"samples": []}', encoding="utf-8")
+
+    with (
+        patch(
+            "slidekick.recognition.training_runner.windows_path_to_wsl",
+            side_effect=lambda path: f"/converted/{path.name}",
+        ),
+        patch(
+            "slidekick.recognition.training_runner.run_wsl_training_job",
+        ) as run_job,
+    ):
+        training_runner.run_repo_wsl_training_job(
+            job=job,
+            manifest_path=manifest_path,
+        )
+
+    assert run_job.call_args.kwargs["manifest_path"] == manifest_path
