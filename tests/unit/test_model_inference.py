@@ -36,6 +36,14 @@ def mock_recognizer(
     predictions: list[str],
 ) -> MagicMock:
     """Replace model inference with a predictable sequence of predictions."""
+
+    # Avoid loading MediaPipe's native image library during unit tests.
+    monkeypatch.setattr(
+        model_inference.mp,
+        "Image",
+        Mock(),
+    )
+
     recognizer = MagicMock()
 
     results = []
