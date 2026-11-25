@@ -11,6 +11,18 @@ Control presentations with hand gestures. SlideKick watches a webcam, recognizes
 
 Runs on macOS and Windows. CI runs on Linux.
 
+## Custom Gesture Training
+
+SlideKick includes a custom hand gesture training pipeline built with MediaPipe Model Maker.
+
+The training backend supports labeled dataset preparation, capture-group-aware splitting, model evaluation, acceptance checks, activation, and rollback.
+
+Training uses a dedicated Python 3.10 environment. The application-to-training handoff has been verified on Windows using WSL, while the main application runs on Python 3.11.
+
+**Sprint 5 status:** The standalone training pipeline and R04 enrollment-data compatibility have been tested successfully. The full enrollment UI, training-service endpoints, and live model switching are planned for Sprint 6 integration.
+
+For setup instructions, training commands, dataset requirements, and testing details, see [Custom Gesture Training](training/README.md).
+
 ## Setup
 
 **Prerequisites:** Python 3.11, Node 20, Git.
